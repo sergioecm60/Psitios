@@ -4,6 +4,7 @@
  * CRUD de usuarios (admin)
  */
 
+// Usa __DIR__ para evitar errores de ruta
 require_once __DIR__ . '/../bootstrap.php';
 require_auth('admin');
 
@@ -35,12 +36,10 @@ try {
                             c.name as company_name,
                             b.name as branch_name,
                             b.province,
-                            u.assigned_admin_id,
-                            a.username as admin_username
+                            u.assigned_admin_id
                         FROM users u
                         LEFT JOIN companies c ON u.company_id = c.id
                         LEFT JOIN branches b ON u.branch_id = b.id
-                        LEFT JOIN users a ON u.assigned_admin_id = a.id
                         ORDER BY u.username ASC
                     ");
                     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -83,8 +82,21 @@ try {
                         echo json_encode(['success' => false, 'message' => 'ID de usuario no proporcionado']);
                         exit;
                     }
+
+                    // Verificar si existe la tabla `services`
+                    $tables = $pdo->query("SHOW TABLES LIKE 'services'")->fetchAll();
+                    if (empty($tables)) {
+                        echo json_encode(['success' => true, 'data' => []]); // Tabla no existe = no hay sitios
+                        exit;
+                    }
+
                     $stmt = $pdo->prepare("
-                        SELECT s.id, st.name, st.url, s.username, s.password_needs_update
+                        SELECT 
+                            s.id, 
+                            st.name, 
+                            st.url, 
+                            s.username, 
+                            s.password_needs_update
                         FROM services s
                         JOIN sites st ON s.site_id = st.id
                         WHERE s.user_id = ?
@@ -98,95 +110,6 @@ try {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'message' => 'Acción no válida']);
                     break;
-            }
-            break;
-
-        case 'POST':
-            validate_csrf_token();
-            $input = json_decode(file_get_contents('php://input'), true);
-            $id = $input['id'] ?? null;
-            $username = trim($input['username'] ?? '');
-            $role = $input['role'] ?? 'user';
-            $is_active = $input['is_active'] ?? 1;
-            $company_id = $input['company_id'] ?? null;
-            $branch_id = $input['branch_id'] ?? null;
-            $password = $input['password'] ?? null;
-            $assigned_sites = $input['assigned_sites'] ?? [];
-
-            if (empty($username)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Nombre de usuario requerido']);
-                exit;
-            }
-
-            if ($role !== 'user' && $role !== 'admin') {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Rol inválido']);
-                exit;
-            }
-
-            $password_hash = $password ? password_hash($password, PASSWORD_DEFAULT) : null;
-
-            if ($id) {
-                // Editar usuario
-                $stmt = $pdo->prepare("
-                    UPDATE users 
-                    SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?
-                    " . ($password_hash ? ", password_hash = ?" : "") . "
-                    WHERE id = ?
-                ");
-                $params = [$username, $role, $is_active, $company_id, $branch_id];
-                if ($password_hash) $params[] = $password_hash;
-                $params[] = $id;
-                $stmt->execute($params);
-                echo json_encode(['success' => true, 'message' => 'Usuario actualizado']);
-            } else {
-                // Crear usuario
-                $stmt = $pdo->prepare("
-                    INSERT INTO users (username, role, is_active, company_id, branch_id, password_hash, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ");
-                $stmt->execute([$username, $role, $is_active, $company_id, $branch_id, $password_hash, $_SESSION['user_id']]);
-                $newId = $pdo->lastInsertId();
-
-                // Asignar admin (el creador)
-                $stmt = $pdo->prepare("UPDATE users SET assigned_admin_id = ? WHERE id = ?");
-                $stmt->execute([$_SESSION['user_id'], $newId]);
-
-                echo json_encode(['success' => true, 'message' => 'Usuario creado', 'id' => $newId]);
-            }
-
-            // Asignar sitios
-            if (!empty($assigned_sites)) {
-                $stmt = $pdo->prepare("DELETE FROM services WHERE user_id = ?");
-                $stmt->execute([$id ?: $newId]);
-
-                $insertStmt = $pdo->prepare("
-                    INSERT INTO services (user_id, site_id, username, password_hash, password_needs_update)
-                    SELECT ?, site_id, '', '', 0 FROM sites WHERE id = ?
-                ");
-                foreach ($assigned_sites as $site_id) {
-                    $insertStmt->execute([$id ?: $newId, $site_id]);
-                }
-            }
-            break;
-
-        case 'DELETE':
-            validate_csrf_token();
-            $input = json_decode(file_get_contents('php://input'), true);
-            $id = $input['id'] ?? null;
-            if (!$id) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'ID no proporcionado']);
-                exit;
-            }
-            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->execute([$id]);
-            if ($stmt->rowCount() > 0) {
-                echo json_encode(['success' => true, 'message' => 'Usuario eliminado']);
-            } else {
-                http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
             }
             break;
 
