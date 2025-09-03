@@ -1,0 +1,19 @@
+# Composer - Dependencias de PHP
+/vendor/
+
+# Archivos de entorno - ¡Contienen secretos!
+.env
+.env.local
+.env.*.local
+
+# Archivos de registro y logs
+*.log
+logs/
+
+# Archivos de configuración del editor de código
+.vscode/
+.idea/
+
+# Archivos del sistema operativo
+.DS_Store
+Thumbs.db

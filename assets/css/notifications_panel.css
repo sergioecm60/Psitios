@@ -1,0 +1,208 @@
+/* === NOTIFICATIONS PANEL CSS === */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+.notifications-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.notifications-title {
+    font-size: 24px;
+    font-weight: bold;
+    color: #333;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.notification-badge {
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 20px;
+    text-align: center;
+    display: none;
+}
+
+.header-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.notifications-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.notification-item {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.notification-item:last-child {
+    border-bottom: none;
+}
+
+.notification-item:hover {
+    background-color: #f8f9fa;
+}
+
+.notification-item.unread {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+}
+
+.notification-item.unread::before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 20px;
+    width: 8px;
+    height: 8px;
+    background: #ffc107;
+    border-radius: 50%;
+}
+
+.notification-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 8px;
+    padding-left: 15px;
+}
+
+.notification-item.unread .notification-title {
+    color: #856404;
+}
+
+.notification-message {
+    color: #666;
+    line-height: 1.4;
+    margin-bottom: 10px;
+    padding-left: 15px;
+}
+
+.notification-meta {
+    font-size: 12px;
+    color: #999;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
+    padding-left: 15px;
+    margin-bottom: 10px;
+}
+
+.notification-site {
+    color: #007bff;
+    font-weight: 500;
+    background: #e3f2fd;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.notification-resolved {
+    color: #28a745;
+    font-weight: 500;
+    background: #d4edda;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.mark-read-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.2s;
+    margin-left: 15px;
+}
+
+.mark-read-btn:hover {
+    background: #0056b3;
+}
+
+.mark-all-read-btn {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.mark-all-read-btn:hover {
+    background: #218838;
+}
+
+.retry-btn {
+    background: #ffc107;
+    color: #212529;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.retry-btn:hover {
+    background: #e0a800;
+}
+
+.no-notifications {
+    padding: 40px;
+    text-align: center;
+    color: #999;
+    font-size: 16px;
+}
+
+.loading {
+    padding: 40px;
+    text-align: center;
+    color: #666;
+}
+
+.error-message {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 15px;
+    border: 1px solid #f5c6cb;
+    border-radius: 4px;
+    margin: 10px 0;
+    display: none;
+}
+
+.success-message {
+    background-color: #d1edff;
+    color: #0c5460;
+    padding: 15px;
+    border: 1px solid #bee5eb;
+    border-radius: 4px;
+    margin: 10px 0;
+    display: none;
+}

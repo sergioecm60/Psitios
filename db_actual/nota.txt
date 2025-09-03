@@ -1,0 +1,28 @@
+Usuario incluido en /config.php y /config/database.php
+secmpanel
+Psitios2025
+
+si este usuario no esta presente, no funcionara la base de datos, por ende la aplicación.
+
+## 🔐 Creación de base de datos y usuario
+
+Ejecuta estos comandos en tu cliente de MySQL (como `mysql -u root -p`):
+
+```sql
+CREATE DATABASE IF NOT EXISTS secure_panel_db
+CHARACTER SET utf8mb4
+COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS 'secmpanel'@'localhost' IDENTIFIED BY 'Psitios2025';
+
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE ON secure_panel_db.* TO 'secmpanel'@'localhost';
+
+FLUSH PRIVILEGES;
+
+Explicación de los permisos
+SELECT Leer datos (login, mostrar info, etc.)
+INSERT Agregar registros (nuevos usuarios, logs, etc.)
+UPDATE Modificar registros (editar usuario, cambiar pass)
+DELETE Eliminar registros (borrar entradas)
+CREATE Crear tablas o índices (necesario para instalación o migraciones)
+
