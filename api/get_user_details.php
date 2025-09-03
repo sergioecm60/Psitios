@@ -1,21 +1,13 @@
 <?php
 header('Content-Type: application/json');
-session_start();
 
-require_once '../vendor/autoload.php';
-require_once '../includes/db.php';
-require_once '../includes/functions.php';
+// Carga centralizada de configuración, dependencias y funciones.
+// Este archivo se encarga de iniciar la sesión, cargar .env, etc.
+require_once '../bootstrap.php';
 
-// Cargar variables de entorno
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
-$dotenv->load();
-
-// Verificar sesión y rol de administrador
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
-    http_response_code(403); // Forbidden
-    echo json_encode(['success' => false, 'message' => 'Acceso denegado. Se requiere ser administrador.']);
-    exit;
-}
+// Función de ayuda para verificar la autenticación y el rol.
+// Asumimos que esta función está definida en bootstrap.php o functions.php
+require_auth('admin');
 
 // Obtener y validar el ID del usuario de la URL
 $user_id_to_fetch = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);

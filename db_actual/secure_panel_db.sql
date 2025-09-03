@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Sep 03, 2025 at 01:14 PM
+-- Generation Time: Sep 03, 2025 at 06:45 PM
 -- Server version: 8.4.3
 -- PHP Version: 8.3.16
 
@@ -49,6 +49,13 @@ CREATE TABLE `branches` (
   `province` varchar(50) COLLATE utf8mb4_spanish_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
+--
+-- Dumping data for table `branches`
+--
+
+INSERT INTO `branches` (`id`, `company_id`, `name`, `province`) VALUES
+(1, 1, 'test', 'Buenos Aires');
+
 -- --------------------------------------------------------
 
 --
@@ -61,6 +68,14 @@ CREATE TABLE `companies` (
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
 
+--
+-- Dumping data for table `companies`
+--
+
+INSERT INTO `companies` (`id`, `name`, `created_at`) VALUES
+(1, 'Prueba', '2025-09-03 15:35:36'),
+(2, 'Prueba2', '2025-09-03 15:35:45');
+
 -- --------------------------------------------------------
 
 --
@@ -69,8 +84,8 @@ CREATE TABLE `companies` (
 
 CREATE TABLE `messages` (
   `id` int NOT NULL,
-  `sender_id` int NOT NULL,
-  `receiver_id` int NOT NULL,
+  `sender_id` int DEFAULT NULL,
+  `receiver_id` int DEFAULT NULL,
   `message` text COLLATE utf8mb4_spanish_ci NOT NULL,
   `is_read` tinyint(1) DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
@@ -103,7 +118,8 @@ INSERT INTO `notifications` (`id`, `user_id`, `site_id`, `message`, `is_read`, `
 (19, 7, 9, 'Tu cuenta en Cloud Panel ha sido activada.', 1, '2025-09-01 16:35:30', NULL, NULL),
 (20, 8, 8, 'Se te ha asignado permisos de lectura en Proxmox.', 0, '2025-09-01 18:15:30', NULL, NULL),
 (21, 8, 9, 'Bienvenido al Cloud Panel, tu perfil está completo.', 0, '2025-09-01 17:35:30', NULL, NULL),
-(24, 8, 8, '🚨 El usuario \'juanp\' reportó un problema con el sitio \'Proxmox\'.', 0, '2025-09-02 20:22:35', NULL, NULL);
+(24, 8, 8, '🚨 El usuario \'juanp\' reportó un problema con el sitio \'Proxmox\'.', 0, '2025-09-02 20:22:35', NULL, NULL),
+(25, 8, 9, '🚨 El usuario \'juanp\' reportó un problema con el sitio \'Cloud Panel\'.', 0, '2025-09-03 18:28:27', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -148,16 +164,17 @@ CREATE TABLE `sites` (
   `password_encrypted` blob COMMENT 'Contraseña encriptada para este sitio',
   `iv` blob COMMENT 'Vector de inicialización para la encriptación',
   `password_needs_update` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Flag para notificar si la pass expiró',
-  `notes` text COLLATE utf8mb4_unicode_ci
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_by` int UNSIGNED NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `sites`
 --
 
-INSERT INTO `sites` (`id`, `name`, `url`, `username`, `password_encrypted`, `iv`, `password_needs_update`, `notes`) VALUES
-(8, 'Proxmox', 'https://magnahoteles.dnsalias.com:8006', 'root', 0x684b7775345942517a497a305562657832655a6258773d3d, 0xb1660c5ebc2df2e3d4e7cca161372187, 0, 'Proxmox 9 Testing'),
-(9, 'Cloud Panel', 'https://magnahoteles.dnsalias.com:8443', 'root', 0x3957345565434658695074416b6e42316b6e547138513d3d, 0x9577ef7f8b582fd40e7791d76a7dafa5, 0, 'Cloud Panel Testing');
+INSERT INTO `sites` (`id`, `name`, `url`, `username`, `password_encrypted`, `iv`, `password_needs_update`, `notes`, `created_by`) VALUES
+(8, 'Proxmox', 'https://10.10.0.1:8006', 'root', 0x684b7775345942517a497a305562657832655a6258773d3d, 0xb1660c5ebc2df2e3d4e7cca161372187, 0, 'Proxmox 9 Testing', 0),
+(9, 'Cloud Panel', 'https://10.10.0.50:8443', 'root', 0x3957345565434658695074416b6e42316b6e547138513d3d, 0x9577ef7f8b582fd40e7791d76a7dafa5, 0, 'Cloud Panel Testing', 0);
 
 -- --------------------------------------------------------
 
@@ -169,23 +186,25 @@ CREATE TABLE `users` (
   `id` int NOT NULL,
   `username` varchar(50) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
-  `role` enum('admin','user') NOT NULL DEFAULT 'user',
+  `role` enum('superadmin','admin','user') NOT NULL DEFAULT 'user',
   `company_id` int DEFAULT NULL,
   `branch_id` int DEFAULT NULL,
   `assigned_admin_id` int DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
-  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_by` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `company_id`, `branch_id`, `assigned_admin_id`, `is_active`, `created_at`) VALUES
-(1, 'admin', '$2y$10$NlguZUw9cO1.weM9Sw2sL.1B61BTQNhv/5do/Z66SLZOR8Zo7OdIy', 'admin', NULL, NULL, NULL, 1, '2025-08-27 19:37:58'),
-(7, 'BrianF', '$2y$10$c1TokUq/pEiBgwV07Gpl0ekWFJu6gcjhurDZMBuaWiGrsH30CzMcq', 'admin', NULL, NULL, NULL, 1, '2025-08-29 14:23:03'),
-(8, 'juanp', '$2y$10$XTEQVVrGcECeUU2/5xU0ceTTOqhyeo2GifgIHDyMUprTItE7HgSQu', 'user', NULL, NULL, 1, 1, '2025-08-29 20:10:43'),
-(9, 'pepea', '$2y$10$3NAssuFIKCg1WGSTurI1BOR8tsp3dQ92tOQ8O/QL6BOV0sUmzN/BK', 'user', NULL, NULL, 1, 1, '2025-09-02 16:21:49');
+INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `company_id`, `branch_id`, `assigned_admin_id`, `is_active`, `created_at`, `created_by`) VALUES
+(1, 'admin', '$2y$10$NlguZUw9cO1.weM9Sw2sL.1B61BTQNhv/5do/Z66SLZOR8Zo7OdIy', 'admin', 1, 1, NULL, 1, '2025-08-27 19:37:58', NULL),
+(7, 'BrianF', '$2y$10$c1TokUq/pEiBgwV07Gpl0ekWFJu6gcjhurDZMBuaWiGrsH30CzMcq', 'admin', NULL, NULL, NULL, 1, '2025-08-29 14:23:03', NULL),
+(8, 'juanp', '$2y$10$XTEQVVrGcECeUU2/5xU0ceTTOqhyeo2GifgIHDyMUprTItE7HgSQu', 'user', NULL, NULL, 1, 1, '2025-08-29 20:10:43', NULL),
+(9, 'pepea', '$2y$10$3NAssuFIKCg1WGSTurI1BOR8tsp3dQ92tOQ8O/QL6BOV0sUmzN/BK', 'user', NULL, NULL, 1, 1, '2025-09-02 16:21:49', NULL),
+(10, 'javiero', '$2y$10$9ZW6pm1D8ssF1.b4ekesEOToDdY3HL1uIm/kFA7ACFUj1vOVgizOC', 'user', 1, 1, 1, 1, '2025-09-03 18:38:55', 1);
 
 -- --------------------------------------------------------
 
@@ -264,7 +283,8 @@ ALTER TABLE `users`
   ADD UNIQUE KEY `username` (`username`),
   ADD KEY `company_id` (`company_id`),
   ADD KEY `branch_id` (`branch_id`),
-  ADD KEY `assigned_admin_id` (`assigned_admin_id`);
+  ADD KEY `idx_created_by` (`created_by`),
+  ADD KEY `fk_assigned_admin` (`assigned_admin_id`);
 
 --
 -- Indexes for table `user_sites`
@@ -288,13 +308,13 @@ ALTER TABLE `audit_logs`
 -- AUTO_INCREMENT for table `branches`
 --
 ALTER TABLE `branches`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `companies`
 --
 ALTER TABLE `companies`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `messages`
@@ -306,7 +326,7 @@ ALTER TABLE `messages`
 -- AUTO_INCREMENT for table `notifications`
 --
 ALTER TABLE `notifications`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=25;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `services`
@@ -324,7 +344,7 @@ ALTER TABLE `sites`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `user_sites`
@@ -350,13 +370,6 @@ ALTER TABLE `branches`
   ADD CONSTRAINT `branches_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `messages`
---
-ALTER TABLE `messages`
-  ADD CONSTRAINT `messages_ibfk_1` FOREIGN KEY (`sender_id`) REFERENCES `users` (`id`),
-  ADD CONSTRAINT `messages_ibfk_2` FOREIGN KEY (`receiver_id`) REFERENCES `users` (`id`);
-
---
 -- Constraints for table `notifications`
 --
 ALTER TABLE `notifications`
@@ -367,16 +380,16 @@ ALTER TABLE `notifications`
 -- Constraints for table `services`
 --
 ALTER TABLE `services`
-  ADD CONSTRAINT `fk_services_site` FOREIGN KEY (`site_id`) REFERENCES `sites` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
-  ADD CONSTRAINT `services_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+  ADD CONSTRAINT `fk_services_site` FOREIGN KEY (`site_id`) REFERENCES `sites` (`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
 -- Constraints for table `users`
 --
 ALTER TABLE `users`
+  ADD CONSTRAINT `fk_assigned_admin` FOREIGN KEY (`assigned_admin_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
-  ADD CONSTRAINT `users_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`),
-  ADD CONSTRAINT `users_ibfk_3` FOREIGN KEY (`assigned_admin_id`) REFERENCES `users` (`id`);
+  ADD CONSTRAINT `users_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`);
 
 --
 -- Constraints for table `user_sites`

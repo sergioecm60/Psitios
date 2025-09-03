@@ -1,81 +1,56 @@
 <?php
 /**
  * api/send_message.php
- * Permite enviar un mensaje a otro usuario (ej: usuario → admin o admin → usuario).
- * Si no se especifica receiver_id, se envía al admin asignado (para usuarios).
+ * Envía un mensaje de un usuario a otro.
  */
 
-require_once '../bootstrap.php';
-require_auth(); // Cualquier usuario autenticado puede enviar
+require_once __DIR__ . '/../bootstrap.php';
+require_auth('user'); // Permite user, admin, superadmin
 
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método no permitido.']);
+    echo json_encode(['success' => false, 'message' => 'Método no permitido']);
     exit;
 }
 
-// Validar CSRF
-$csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if (!verify_csrf_token($csrf_token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido.']);
-    exit;
-}
+validate_csrf_token();
 
-// Decodificar cuerpo JSON
 $input = json_decode(file_get_contents('php://input'), true);
+$receiver_id = $input['receiver_id'] ?? null;
 $message = trim($input['message'] ?? '');
-$receiver_id = filter_var($input['receiver_id'] ?? null, FILTER_VALIDATE_INT);
 
-$user_id = $_SESSION['user_id'];
+if (!$receiver_id || !$message) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'message' => 'Datos incompletos']);
+    exit;
+}
+
 $pdo = get_pdo_connection();
+$sender_id = $_SESSION['user_id'];
 
-try {
-    // Si es un usuario normal y no especifica receptor, usar su admin asignado
-    if (!$receiver_id && $_SESSION['role'] === 'user') {
-        $stmt = $pdo->prepare("SELECT assigned_admin_id FROM users WHERE id = ?");
-        $stmt->execute([$user_id]);
-        $admin_id = $stmt->fetchColumn();
+// Verificar que el receptor exista
+$stmt = $pdo->prepare("SELECT id FROM users WHERE id = ?");
+$stmt->execute([$receiver_id]);
+if (!$stmt->fetch()) {
+    http_response_code(404);
+    echo json_encode(['success' => false, 'message' => 'Usuario receptor no encontrado']);
+    exit;
+}
 
-        if (!$admin_id) {
-            throw new Exception('No tienes un administrador asignado.');
-        }
-        $receiver_id = $admin_id;
+// Enviar mensaje
+$stmt = $pdo->prepare("
+    INSERT INTO messages (sender_id, receiver_id, message)
+    VALUES (?, ?, ?)
+");
+$stmt->execute([$sender_id, $receiver_id, $message]);
+
+echo json_encode(['success' => true, 'message' => 'Mensaje enviado']);
+
+function validate_csrf_token() {
+    $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!verify_csrf_token($csrf_token)) {
+        throw new Exception('Token CSRF inválido');
     }
-
-    // Validar que el receptor existe y es válido
-    $stmt = $pdo->prepare("SELECT id, role FROM users WHERE id = ? AND id != ?");
-    $stmt->execute([$receiver_id, $user_id]);
-    $receiver = $stmt->fetch();
-
-    if (!$receiver) {
-        http_response_code(400);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Destinatario no válido.'
-        ]);
-        exit;
-    }
-
-    // Guardar mensaje
-    $stmt = $pdo->prepare("
-        INSERT INTO messages (sender_id, receiver_id, message, is_read, created_at)
-        VALUES (?, ?, ?, 0, NOW())
-    ");
-    $stmt->execute([$user_id, $receiver_id, $message]);
-
-    echo json_encode([
-        'success' => true,
-        'message' => 'Mensaje enviado correctamente.'
-    ]);
-
-} catch (Exception $e) {
-    error_log("Error en send_message.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error al enviar el mensaje.'
-    ]);
 }

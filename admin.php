@@ -1,10 +1,7 @@
 <?php
 require_once 'bootstrap.php';
-
-// 1. Seguridad: Solo administradores
 require_auth('admin');
 
-// 2. Token CSRF
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -17,7 +14,6 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración</title>
     <meta name="csrf-token" content="<?php echo $csrf_token; ?>">
-
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f9; margin: 0; color: #333; }
         .container { max-width: 1200px; margin: 20px auto; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
@@ -66,18 +62,14 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         .form-check { margin-bottom: 8px; }
         .form-actions { text-align: right; margin-top: 20px; }
     </style>
-
-    <!-- Estilo del panel de notificaciones -->
     <link rel="stylesheet" href="assets/css/notifications_panel.css">
 </head>
 <body>
-
     <div class="container">
         <header>
             <h1>Panel de Administración</h1>
             <a href="logout.php">Cerrar Sesión</a>
         </header>
-
         <nav class="tab-nav">
             <button class="tab-link active" data-tab="users-tab">Usuarios</button>
             <button class="tab-link" data-tab="companies-tab">🏢 Empresas</button>
@@ -104,9 +96,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Se llena con JS -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -123,9 +113,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Se llena con JS -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -143,9 +131,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Se llena con JS -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -164,9 +150,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- Se llena con JS -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
         </div>
@@ -184,9 +168,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody id="messages-table-body">
-                        <!-- Se llena con JS -->
-                    </tbody>
+                    <tbody id="messages-table-body"></tbody>
                 </table>
             </div>
         </div>
@@ -478,6 +460,29 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             }
         }
 
+        function safeDate(dateString) {
+            if (!dateString) return 'No especificado';
+            const date = new Date(dateString);
+            return isNaN(date.getTime()) 
+                ? 'Fecha inválida' 
+                : date.toLocaleDateString('es-ES', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                });
+        }
+
+        function escapeHtml(unsafe) {
+            if (unsafe === null || typeof unsafe === 'undefined') return '';
+            return unsafe
+                 .toString()
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "<")
+                 .replace(/>/g, ">")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
         // --- GESTIÓN DE USUARIOS ---
         const usersTableBody = document.querySelector('#users-table tbody');
         const userModal = document.getElementById('user-modal');
@@ -504,7 +509,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     <td>${escapeHtml(user.company_name || '-')}</td>
                     <td>${escapeHtml(user.branch_name || '-')}</td>
                     <td>${escapeHtml(user.province || '-')}</td>
-                    <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                    <td>${safeDate(user.created_at)}</td>
                     <td>
                         <span class="status-toggle ${user.is_active ? 'active' : 'inactive'}" data-user-id="${user.id}" data-active="${user.is_active}">
                             ${user.is_active ? 'Activo' : 'Inactivo'}
@@ -579,6 +584,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         async function loadCompanies() {
             const companySelect = document.getElementById('company_id');
             if (!companySelect) return;
+            companySelect.innerHTML = '<option value="">Cargando empresas...</option>';
             try {
                 const result = await apiCall('api/get_companies.php');
                 if (result.success) {
@@ -589,9 +595,11 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                         option.textContent = company.name;
                         companySelect.appendChild(option);
                     });
+                } else {
+                    companySelect.innerHTML = '<option value="">Error al cargar</option>';
                 }
             } catch (error) {
-                companySelect.innerHTML = '<option value="">Error al cargar empresas</option>';
+                companySelect.innerHTML = '<option value="">Error</option>';
             }
         }
 
@@ -599,6 +607,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             const companyId = this.value;
             const branchSelect = document.getElementById('branch_id');
             if (companyId) {
+                branchSelect.innerHTML = '<option value="">Cargando...</option>';
                 await loadBranches(companyId);
             } else {
                 branchSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
@@ -618,9 +627,11 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                         if (branch.id == selectedId) option.selected = true;
                         branchSelect.appendChild(option);
                     });
+                } else {
+                    branchSelect.innerHTML = '<option value="">Error</option>';
                 }
             } catch (error) {
-                branchSelect.innerHTML = '<option value="">Error al cargar sucursales</option>';
+                branchSelect.innerHTML = '<option value="">Error</option>';
             }
         }
 
@@ -755,11 +766,15 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 
         function renderCompaniesTable(companies) {
             companiesTableBody.innerHTML = '';
+            if (companies.length === 0) {
+                companiesTableBody.innerHTML = '<tr><td colspan="3">No hay empresas para mostrar.</td></tr>';
+                return;
+            }
             companies.forEach(company => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${escapeHtml(company.name)}</td>
-                    <td>${new Date(company.created_at).toLocaleDateString()}</td>
+                    <td>${safeDate(company.created_at)}</td>
                     <td class="actions">
                         <a href="#" class="btn btn-secondary btn-sm edit-company-btn" data-id="${company.id}">Editar</a>
                         <a href="#" class="btn btn-danger btn-sm delete-company-btn" data-id="${company.id}">Eliminar</a>
@@ -801,7 +816,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             if (result && result.success) {
                 closeModal('company-modal');
                 fetchCompanies();
-                loadCompanies(); // Recargar en modal de usuario
+                loadCompanies();
             }
         });
 
@@ -819,6 +834,10 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 
         function renderBranchesTable(branches) {
             branchesTableBody.innerHTML = '';
+            if (branches.length === 0) {
+                branchesTableBody.innerHTML = '<tr><td colspan="4">No hay sucursales para mostrar.</td></tr>';
+                return;
+            }
             branches.forEach(branch => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
@@ -874,6 +893,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 
         async function loadBranchCompanies() {
             const select = document.getElementById('branch-company-id');
+            select.innerHTML = '<option value="">Cargando...</option>';
             try {
                 const result = await apiCall('api/get_companies.php');
                 if (result.success) {
@@ -884,9 +904,11 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                         option.textContent = company.name;
                         select.appendChild(option);
                     });
+                } else {
+                    select.innerHTML = '<option value="">Error</option>';
                 }
             } catch (error) {
-                select.innerHTML = '<option value="">Error al cargar</option>';
+                select.innerHTML = '<option value="">Error</option>';
             }
         }
 
@@ -913,12 +935,11 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                 messagesTableBody.innerHTML = '<tr><td colspan="4">No hay mensajes.</td></tr>';
                 return;
             }
-
             messagesTableBody.innerHTML = messages.map(msg => `
                 <tr>
                     <td>${escapeHtml(msg.username)}</td>
-                    <td>${escapeHtml(msg.message.substring(0, 60))}${msg.message.length > 60 ? '...' : ''}</td>
-                    <td>${new Date(msg.created_at).toLocaleString()}</td>
+                    <td title="${escapeHtml(msg.message)}">${escapeHtml(msg.message.substring(0, 60))}${msg.message.length > 60 ? '...' : ''}</td>
+                    <td>${safeDate(msg.created_at)}</td>
                     <td class="actions">
                         <a href="#" class="btn btn-secondary btn-sm reply-btn" data-user-id="${msg.sender_id}" data-username="${escapeHtml(msg.username)}">Responder</a>
                         <a href="#" class="btn btn-danger btn-sm delete-msg-btn" data-id="${msg.id}">Eliminar</a>
@@ -944,7 +965,6 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     }
                 }
             }
-
             if (e.target.classList.contains('delete-msg-btn')) {
                 e.preventDefault();
                 if (!confirm('¿Eliminar este mensaje?')) return;
@@ -957,24 +977,12 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         });
 
         // --- INICIALIZACIÓN ---
-        function escapeHtml(unsafe) {
-            if (unsafe === null || typeof unsafe === 'undefined') return '';
-            return unsafe
-                 .toString()
-                 .replace(/&/g, "&amp;")
-                 .replace(/</g, "<")
-                 .replace(/>/g, ">")
-                 .replace(/"/g, "&quot;")
-                 .replace(/'/g, "&#039;");
-        }
-
         fetchUsers();
         fetchSites();
         fetchCompanies();
         fetchBranches();
     });
     </script>
-
     <script src="assets/js/notifications_panel.js"></script>
 </body>
 </html>

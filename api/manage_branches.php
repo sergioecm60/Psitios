@@ -4,7 +4,7 @@
  * CRUD de sucursales
  */
 
-require_once '../bootstrap.php';
+require_once __DIR__ . '/../bootstrap.php';
 require_auth('admin');
 
 header('Content-Type: application/json');
