@@ -62,6 +62,17 @@ class NotificationManager {
                         this.deleteNotification(parseInt(notificationId, 10));
                     }
                 }
+
+                // ✅ Detectar clic en botón "Resuelto"
+                const resolveBtn = event.target.closest('.resolve-btn');
+                if (resolveBtn) {
+                    event.preventDefault();
+                    const notificationItem = resolveBtn.closest('.notification-item');
+                    const notificationId = notificationItem ? notificationItem.dataset.id : null;
+                    if (notificationId && confirm('¿Marcar esta notificación como resuelta?')) {
+                        this.resolveNotification(parseInt(notificationId, 10));
+                    }
+                }
             });
         }
     }
@@ -73,7 +84,7 @@ class NotificationManager {
         this.isLoading = true;
 
         try {
-            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
+            const response = await fetch('api/notifications_api.php', {
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -161,20 +172,25 @@ class NotificationManager {
             return;
         }
 
-        container.innerHTML = notifications.map(notification => `
-            <div class="notification-item ${notification.is_read ? '' : 'unread'}" data-id="${notification.id}">
-                <div class="notification-title">${this.escapeHtml(notification.title || 'Notificación')}</div>
-                <div class="notification-message">${this.escapeHtml(notification.message)}</div>
-                <div class="notification-meta">
-                    <span class="notification-time">⏰ ${this.formatTime(notification.created_at)}</span>
-                    ${notification.site_name ? `<span class="notification-site">🌐 ${this.escapeHtml(notification.site_name)}</span>` : ''}
-                    ${notification.resolved_at ? `<span class="notification-resolved">✅ Resuelto: ${this.formatTime(notification.resolved_at)}</span>` : ''}
+        container.innerHTML = notifications.map(notification => {
+            const isResolved = !!notification.resolved_at;
+            return `
+                <div class="notification-item ${notification.is_read ? '' : 'unread'}" data-id="${notification.id}">
+                    <div class="notification-title">${this.escapeHtml(notification.title || 'Notificación')}</div>
+                    <div class="notification-message">${this.escapeHtml(notification.message)}</div>
+                    <div class="notification-meta">
+                        <span class="notification-time">⏰ ${this.formatTime(notification.created_at)}</span>
+                        ${notification.site_name ? `<span class="notification-site">🌐 ${this.escapeHtml(notification.site_name)}</span>` : ''}
+                        ${isResolved 
+                            ? `<span class="notification-resolved">✅ Resuelto: ${this.formatTime(notification.resolved_at)}</span>` 
+                            : `<button class="resolve-btn" style="background: #28a745; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">✅ Resuelto</button>`
+                        }
+                    </div>
+                    ${!notification.is_read && !isResolved ? '<button class="mark-read-btn">✓ Marcar como leída</button>' : ''}
+                    <button class="delete-notification-btn" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">🗑️</button>
                 </div>
-                ${!notification.is_read ? '<button class="mark-read-btn">✓ Marcar como leída</button>' : ''}
-                <!-- ✅ Botón eliminar -->
-                <button class="delete-notification-btn" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">🗑️</button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     // ✅ Nueva función: Eliminar notificación
@@ -196,7 +212,7 @@ class NotificationManager {
                 headers['X-CSRF-TOKEN'] = this.csrfToken;
             }
 
-            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
+            const response = await fetch('api/notifications_api.php', {
                 method: 'POST',
                 headers: headers,
                 credentials: 'same-origin',
@@ -207,7 +223,7 @@ class NotificationManager {
             
             if (data.success) {
                 this.showSuccess('Notificación eliminada');
-                this.fetchNotifications(); // Refrescar
+                this.fetchNotifications();
             } else {
                 this.showError('Error: ' + data.message);
             }
@@ -216,6 +232,7 @@ class NotificationManager {
         }
     }
 
+    // ✅ Nueva función: Marcar como leída
     async markAsRead(notificationId) {
         try {
             const requestBody = {
@@ -232,7 +249,7 @@ class NotificationManager {
                 headers['X-CSRF-TOKEN'] = this.csrfToken;
             }
 
-            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
+            const response = await fetch('api/notifications_api.php', {
                 method: 'POST',
                 headers: headers,
                 credentials: 'same-origin',
@@ -252,6 +269,7 @@ class NotificationManager {
         }
     }
 
+    // ✅ Nueva función: Marcar todas como leídas
     async markAllAsRead() {
         try {
             const requestBody = {
@@ -267,7 +285,7 @@ class NotificationManager {
                 headers['X-CSRF-TOKEN'] = this.csrfToken;
             }
 
-            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
+            const response = await fetch('api/notifications_api.php', {
                 method: 'POST',
                 headers: headers,
                 credentials: 'same-origin',
@@ -284,6 +302,45 @@ class NotificationManager {
             }
         } catch (error) {
             this.showError('Error al marcar todas como leídas');
+        }
+    }
+
+    // ✅ Nueva función: Resolver notificación
+    async resolveNotification(notificationId) {
+        if (!confirm('¿Marcar esta notificación como resuelta?')) return;
+
+        try {
+            const requestBody = {
+                action: 'resolve',
+                notification_id: notificationId
+            };
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            };
+
+            if (this.csrfToken) {
+                headers['X-CSRF-TOKEN'] = this.csrfToken;
+            }
+
+            const response = await fetch('api/resolve_notification.php', {
+                method: 'POST',
+                headers: headers,
+                credentials: 'same-origin',
+                body: JSON.stringify(requestBody)
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.showSuccess('Notificación resuelta y servicio actualizado.');
+                this.fetchNotifications(); // Refrescar
+            } else {
+                this.showError('Error: ' + data.message);
+            }
+        } catch (error) {
+            this.showError('Error al marcar como resuelto');
         }
     }
 

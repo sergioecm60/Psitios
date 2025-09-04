@@ -1,7 +1,6 @@
 <?php
 require_once 'bootstrap.php';
 require_auth('admin');
-
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
@@ -71,6 +70,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             <a href="logout.php">Cerrar Sesión</a>
         </header>
         <nav class="tab-nav">
+            <button class="tab-link" data-tab="audit-tab">📋 Auditoría</button>
             <button class="tab-link active" data-tab="users-tab">Usuarios</button>
             <button class="tab-link" data-tab="companies-tab">🏢 Empresas</button>
             <button class="tab-link" data-tab="branches-tab">📍 Sucursales</button>
@@ -81,7 +81,8 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 
         <!-- Pestaña de Usuarios -->
         <div id="users-tab" class="tab-content active">
-            <button class="btn btn-primary" id="add-user-btn">Agregar Nuevo Usuario</button>
+            <h2>👥 Gestión de Usuarios</h2>
+            <button class="btn btn-primary" id="add-user-btn">+ Agregar Usuario</button>
             <div class="table-wrapper">
                 <table id="users-table">
                     <thead>
@@ -91,66 +92,69 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                             <th>Empresa</th>
                             <th>Sucursal</th>
                             <th>Provincia</th>
-                            <th>Creado</th>
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody id="users-table-body"></tbody>
                 </table>
             </div>
         </div>
 
         <!-- Pestaña de Empresas -->
         <div id="companies-tab" class="tab-content">
-            <button class="btn btn-primary" id="add-company-btn">Agregar Empresa</button>
+            <h2>🏢 Gestión de Empresas</h2>
+            <button class="btn btn-primary" id="add-company-btn">+ Agregar Empresa</button>
             <div class="table-wrapper">
                 <table id="companies-table">
                     <thead>
                         <tr>
                             <th>Nombre</th>
-                            <th>Creada</th>
+                            <th>Fecha Creación</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody id="companies-table-body"></tbody>
                 </table>
             </div>
         </div>
 
         <!-- Pestaña de Sucursales -->
         <div id="branches-tab" class="tab-content">
-            <button class="btn btn-primary" id="add-branch-btn">Agregar Sucursal</button>
+            <h2>📍 Gestión de Sucursales</h2>
+            <button class="btn btn-primary" id="add-branch-btn">+ Agregar Sucursal</button>
             <div class="table-wrapper">
                 <table id="branches-table">
                     <thead>
                         <tr>
                             <th>Nombre</th>
                             <th>Empresa</th>
+                            <th>País</th>
                             <th>Provincia</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody id="branches-table-body"></tbody>
                 </table>
             </div>
         </div>
 
         <!-- Pestaña de Sitios -->
         <div id="sites-tab" class="tab-content">
-            <button class="btn btn-primary" id="add-site-btn">Agregar Nuevo Sitio</button>
+            <h2>🌐 Gestión de Sitios</h2>
+            <button class="btn btn-primary" id="add-site-btn">+ Agregar Sitio</button>
             <div class="table-wrapper">
                 <table id="sites-table">
                     <thead>
                         <tr>
-                            <th>Nombre del Sitio</th>
+                            <th>Nombre</th>
                             <th>URL</th>
                             <th>Usuario</th>
-                            <th>Notas</th>
+                            <th>Requiere actualización</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody id="sites-table-body"></tbody>
                 </table>
             </div>
         </div>
@@ -210,7 +214,6 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                 <div class="form-group">
                     <label for="password">Contraseña</label>
                     <input type="password" id="password" name="password">
-                    <small>Dejar en blanco para no cambiar la contraseña existente.</small>
                 </div>
                 <div class="form-group">
                     <label for="role">Rol</label>
@@ -235,15 +238,12 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Sitios asignados</label>
-                    <div id="sites-list" style="max-height: 200px; overflow-y: auto;">
-                        <p>Cargando sitios...</p>
-                    </div>
-                    <small>Seleccione los sitios que este usuario puede acceder.</small>
+                    <label>Sitios Asignados</label>
+                    <div id="sites-container"></div>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary close-btn" data-modal-id="user-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('user-modal')">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -264,8 +264,8 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     <input type="text" id="company-name" name="name" required>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary close-btn" data-modal-id="company-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('company-modal')">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -282,69 +282,30 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                 <input type="hidden" id="branch-id" name="id">
                 <input type="hidden" id="branch-action" name="action">
                 <div class="form-group">
+                    <label for="branch-name">Nombre</label>
+                    <input type="text" id="branch-name" name="name" required>
+                </div>
+                <div class="form-group">
                     <label for="branch-company-id">Empresa</label>
                     <select id="branch-company-id" name="company_id" required>
                         <option value="">Seleccionar empresa</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="branch-name">Nombre de la Sucursal</label>
-                    <input type="text" id="branch-name" name="name" required>
+                    <label for="branch-country-id">País</label>
+                    <select id="branch-country-id" name="country_id" required>
+                        <option value="">Seleccionar país</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="branch-province">Provincia</label>
                     <select id="branch-province" name="province" required>
                         <option value="">Seleccionar provincia</option>
-                        <optgroup label="Argentina">
-                            <option value="Buenos Aires">Buenos Aires</option>
-                            <option value="Córdoba">Córdoba</option>
-                            <option value="Santa Fe">Santa Fe</option>
-                            <option value="Mendoza">Mendoza</option>
-                            <option value="Tucumán">Tucumán</option>
-                            <option value="Salta">Salta</option>
-                            <option value="Entre Ríos">Entre Ríos</option>
-                            <option value="Misiones">Misiones</option>
-                            <option value="Chaco">Chaco</option>
-                            <option value="Formosa">Formosa</option>
-                            <option value="Corrientes">Corrientes</option>
-                            <option value="San Juan">San Juan</option>
-                            <option value="San Luis">San Luis</option>
-                            <option value="La Rioja">La Rioja</option>
-                            <option value="Catamarca">Catamarca</option>
-                            <option value="Jujuy">Jujuy</option>
-                            <option value="Río Negro">Río Negro</option>
-                            <option value="Neuquén">Neuquén</option>
-                            <option value="Chubut">Chubut</option>
-                            <option value="Santa Cruz">Santa Cruz</option>
-                            <option value="Tierra del Fuego">Tierra del Fuego</option>
-                        </optgroup>
-                        <optgroup label="Uruguay">
-                            <option value="Montevideo">Montevideo</option>
-                            <option value="Canelones">Canelones</option>
-                            <option value="Maldonado">Maldonado</option>
-                            <option value="Lavalleja">Lavalleja</option>
-                            <option value="Rocha">Rocha</option>
-                            <option value="Treinta y Tres">Treinta y Tres</option>
-                            <option value="Cerro Largo">Cerro Largo</option>
-                            <option value="Rivera">Rivera</option>
-                            <option value="Artigas">Artigas</option>
-                            <option value="Salto">Salto</option>
-                            <option value="Paysandú">Paysandú</option>
-                            <option value="Río Negro">Río Negro</option>
-                            <option value="Soriano">Soriano</option>
-                            <option value="Colonia">Colonia</option>
-                            <option value="San José">San José</option>
-                            <option value="Flores">Flores</option>
-                            <option value="Florida">Florida</option>
-                            <option value="Durazno">Durazno</option>
-                            <option value="Tacuarembó">Tacuarembó</option>
-                            <option value="Paso de los Toros">Paso de los Toros</option>
-                        </optgroup>
                     </select>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary close-btn" data-modal-id="branch-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('branch-modal')">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -366,7 +327,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                 </div>
                 <div class="form-group">
                     <label for="site-url">URL del Sitio</label>
-                    <input type="url" id="site-url" name="url" placeholder="https://ejemplo.com" required>
+                    <input type="text" id="site-url" name="url" placeholder="ej: 192.168.0.1/misitio o https://google.com" required>
                 </div>
                 <div class="form-group">
                     <label for="site-username">Usuario</label>
@@ -392,20 +353,44 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     <textarea id="site-notes" name="notes"></textarea>
                 </div>
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary close-btn" data-modal-id="site-modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('site-modal')">Cancelar</button>
                 </div>
             </form>
         </div>
     </div>
+    <!-- Pestaña de Auditoría -->
+<div id="audit-tab" class="tab-content">
+    <h2>📋 Bitácora de Actividades</h2>
+    <div class="table-wrapper">
+        <table id="audit-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Usuario</th>
+                    <th>Acción</th>
+                    <th>Servicio</th>
+                    <th>IP</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="audit-table-body"></tbody>
+        </table>
+    </div>
+</div>
 
     <script>
     const CSRF_TOKEN = '<?php echo $csrf_token; ?>';
 
+    // Se mueve fuera para que sea accesible globalmente por los atributos onclick=""
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         const tabs = document.querySelectorAll('.tab-link');
         const tabContents = document.querySelectorAll('.tab-content');
-
+        
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 tabs.forEach(t => t.classList.remove('active'));
@@ -418,15 +403,9 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         function openModal(modalId) {
             document.getElementById(modalId).style.display = 'block';
         }
-
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-        }
-
         document.querySelectorAll('.close-btn').forEach(btn => {
             btn.addEventListener('click', () => closeModal(btn.dataset.modalId));
         });
-
         window.addEventListener('click', (event) => {
             if (event.target.classList.contains('modal')) {
                 closeModal(event.target.id);
@@ -466,7 +445,9 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                 : date.toLocaleDateString('es-ES', {
                     year: 'numeric',
                     month: '2-digit',
-                    day: '2-digit'
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit'
                 });
         }
 
@@ -481,9 +462,8 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                  .replace(/'/g, "&#039;");
         }
 
-        // --- GESTIÓN DE USUARIOS ---
-        const usersTableBody = document.querySelector('#users-table tbody');
-        const userModal = document.getElementById('user-modal');
+        // --- USUARIOS ---
+        const usersTableBody = document.querySelector('#users-table-body');
         const userForm = document.getElementById('user-form');
 
         async function fetchUsers() {
@@ -496,7 +476,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         function renderUsersTable(users) {
             usersTableBody.innerHTML = '';
             if (users.length === 0) {
-                usersTableBody.innerHTML = '<tr><td colspan="8">No hay usuarios para mostrar.</td></tr>';
+                usersTableBody.innerHTML = '<tr><td colspan="7">No hay usuarios para mostrar.</td></tr>';
                 return;
             }
             users.forEach(user => {
@@ -507,15 +487,14 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     <td>${escapeHtml(user.company_name || '-')}</td>
                     <td>${escapeHtml(user.branch_name || '-')}</td>
                     <td>${escapeHtml(user.province || '-')}</td>
-                    <td>${safeDate(user.created_at)}</td>
                     <td>
-                        <span class="status-toggle ${user.is_active ? 'active' : 'inactive'}" data-user-id="${user.id}" data-active="${user.is_active}">
+                        <span class="status-toggle ${user.is_active ? 'active' : 'inactive'}">
                             ${user.is_active ? 'Activo' : 'Inactivo'}
                         </span>
                     </td>
                     <td class="actions">
-                        <a href="#" class="btn btn-secondary btn-sm edit-user-btn" data-user-id="${user.id}">Editar</a>
-                        <a href="#" class="btn btn-danger btn-sm delete-user-btn" data-user-id="${user.id}">Eliminar</a>
+                        <button class="btn btn-sm btn-secondary edit-user-btn" data-user-id="${user.id}">Editar</button>
+                        <button class="btn btn-sm btn-danger delete-user-btn" data-user-id="${user.id}">Eliminar</button>
                     </td>
                 `;
                 usersTableBody.appendChild(tr);
@@ -534,6 +513,16 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         });
 
         usersTableBody.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('delete-user-btn')) {
+                e.preventDefault();
+                if (!confirm('¿Eliminar este usuario?')) return;
+                const id = e.target.dataset.userId;
+                const result = await apiCall('api/manage_users.php', 'POST', { action: 'delete', id });
+                if (result && result.success) {
+                    fetchUsers();
+                }
+            }
+
             if (e.target.classList.contains('edit-user-btn')) {
                 e.preventDefault();
                 const id = e.target.dataset.userId;
@@ -546,15 +535,10 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     document.getElementById('user-id').value = user.id;
                     document.getElementById('username').value = user.username;
                     document.getElementById('role').value = user.role;
-                    document.getElementById('is_active').checked = user.is_active == 1;
-                    loadCompanies();
-                    setTimeout(() => {
-                        if (user.company_id) {
-                            document.getElementById('company_id').value = user.company_id;
-                            loadBranches(user.company_id, user.branch_id);
-                        }
-                    }, 300);
-                    loadSitesForUser(user.id);
+                    document.getElementById('is_active').checked = user.is_active;
+                    loadCompanies(user.company_id);
+                    loadBranches(user.company_id, user.branch_id);
+                    setTimeout(() => loadSitesForUser(user.id), 300);
                     openModal('user-modal');
                 }
             }
@@ -562,14 +546,29 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 
         userForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const formData = new FormData(userForm);
-            const data = Object.fromEntries(formData.entries());
-            data.id = parseInt(data.id) || null;
-            data.is_active = document.getElementById('is_active').checked;
 
-            const assignedSites = Array.from(document.querySelectorAll('.site-checkbox:checked'))
-                .map(cb => cb.value);
-            data.assigned_sites = assignedSites;
+            const usernameInput = document.getElementById('username');
+            const username = usernameInput.value.trim();
+            if (!username) {
+                alert('El nombre de usuario es requerido.');
+                usernameInput.focus();
+                return;
+            }
+
+            const data = {
+                id: document.getElementById('user-id').value || null,
+                action: document.getElementById('user-action').value,
+                username: username,
+                password: document.getElementById('password').value || null,
+                role: document.getElementById('role').value,
+                is_active: document.getElementById('is_active').checked,
+                company_id: document.getElementById('company_id').value || null,
+                branch_id: document.getElementById('branch_id').value || null,
+                assigned_sites: Array.from(document.querySelectorAll('.site-checkbox:checked'))
+                    .map(cb => cb.value)
+            };
+
+            if (data.id) data.id = parseInt(data.id);
 
             const result = await apiCall('api/manage_users.php', 'POST', data);
             if (result && result.success) {
@@ -579,7 +578,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         });
 
         // --- CARGA DE EMPRESAS Y SUCURSALES ---
-        async function loadCompanies() {
+        async function loadCompanies(selectedId = null) {
             const companySelect = document.getElementById('company_id');
             if (!companySelect) return;
             companySelect.innerHTML = '<option value="">Cargando empresas...</option>';
@@ -591,6 +590,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                         const option = document.createElement('option');
                         option.value = company.id;
                         option.textContent = company.name;
+                        if (selectedId && company.id == selectedId) option.selected = true;
                         companySelect.appendChild(option);
                     });
                 } else {
@@ -622,137 +622,42 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                         const option = document.createElement('option');
                         option.value = branch.id;
                         option.textContent = `${branch.name} (${branch.province})`;
-                        if (branch.id == selectedId) option.selected = true;
+                        if (selectedId && branch.id == selectedId) option.selected = true;
                         branchSelect.appendChild(option);
                     });
-                } else {
-                    branchSelect.innerHTML = '<option value="">Error</option>';
                 }
             } catch (error) {
                 branchSelect.innerHTML = '<option value="">Error</option>';
             }
         }
 
-        // --- GESTIÓN DE SITIOS ---
-        const sitesTableBody = document.querySelector('#sites-table tbody');
-        const siteModal = document.getElementById('site-modal');
-        const siteForm = document.getElementById('site-form');
-
-        async function fetchSites() {
-            const result = await apiCall('api/manage_sites.php?action=list');
-            if (result && result.success) {
-                renderSitesTable(result.data);
-            }
-        }
-
-        function renderSitesTable(sites) {
-            sitesTableBody.innerHTML = '';
-            sites.forEach(site => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td>${escapeHtml(site.name)}</td>
-                    <td><a href="${escapeHtml(site.url.trim())}" target="_blank">${escapeHtml(site.url.trim())}</a></td>
-                    <td>${escapeHtml(site.username || '-')}</td>
-                    <td>${escapeHtml(site.notes || '-')}</td>
-                    <td class="actions">
-                        <a href="#" class="btn btn-secondary btn-sm edit-site-btn" data-site-id="${site.id}">Editar</a>
-                        <a href="#" class="btn btn-danger btn-sm delete-site-btn" data-site-id="${site.id}">Eliminar</a>
-                    </td>
-                `;
-                sitesTableBody.appendChild(tr);
-            });
-        }
-
-        document.getElementById('add-site-btn').addEventListener('click', () => {
-            siteForm.reset();
-            document.getElementById('site-id').value = '';
-            document.getElementById('site-action').value = 'add';
-            document.getElementById('site-modal-title').textContent = 'Agregar Sitio';
-            openModal('site-modal');
-        });
-
-        sitesTableBody.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('edit-site-btn')) {
-                e.preventDefault();
-                const id = e.target.dataset.siteId;
-                const result = await apiCall(`api/manage_sites.php?action=get&id=${id}`);
-                if (result && result.success) {
-                    const site = result.data;
-                    siteForm.reset();
-                    document.getElementById('site-modal-title').textContent = 'Editar Sitio';
-                    document.getElementById('site-action').value = 'edit';
-                    document.getElementById('site-id').value = site.id;
-                    document.getElementById('site-name').value = site.name;
-                    document.getElementById('site-url').value = site.url.trim();
-                    document.getElementById('site-username').value = site.username;
-                    document.getElementById('site-notes').value = site.notes;
-                    document.getElementById('site-password-needs-update').checked = site.password_needs_update == 1;
-                    openModal('site-modal');
-                }
-            }
-        });
-
-        siteForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const formData = new FormData(siteForm);
-            const data = Object.fromEntries(formData.entries());
-            data.id = parseInt(data.id) || null;
-            const result = await apiCall('api/manage_sites.php', 'POST', data);
-            if (result && result.success) {
-                closeModal('site-modal');
-                fetchSites();
-            }
-        });
-
-        // --- LÓGICA ADICIONAL ---
-        document.querySelector('.toggle-password')?.addEventListener('click', function (e) {
-            const passwordInput = document.getElementById('site-password');
-            const isPassword = passwordInput.getAttribute('type') === 'password';
-            passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-            e.target.textContent = isPassword ? 'Ocultar' : 'Mostrar';
-        });
-
-        // --- CARGA DE SITIOS PARA USUARIOS ---
         async function loadSitesForUser(userId = null) {
-            const sitesContainer = document.getElementById('sites-list');
-            if (!sitesContainer) return;
-            sitesContainer.innerHTML = '<p>Cargando sitios...</p>';
+            const sitesContainer = document.getElementById('sites-container');
             try {
                 const result = await apiCall('api/manage_sites.php?action=list');
-                if (!result || !result.success) throw new Error('Error al cargar sitios');
-                const allSites = result.data;
-                const selectedSites = userId ? await fetchAssignedSites(userId) : [];
-                let html = '';
-                allSites.forEach(site => {
-                    const checked = selectedSites.includes(site.id);
-                    html += `
-                        <div class="form-check">
-                            <input type="checkbox" class="site-checkbox" name="assigned_sites[]" value="${site.id}" ${checked ? 'checked' : ''}>
-                            <label>${escapeHtml(site.name)}</label>
-                        </div>
-                    `;
-                });
-                sitesContainer.innerHTML = html;
+                const assignedResult = userId ? await apiCall(`api/manage_users.php?action=get_assigned_sites&id=${userId}`) : { success: false };
+                const assignedSiteIds = assignedResult.success ? assignedResult.data.map(s => s.id) : [];
+
+                if (result.success) {
+                    let html = '';
+                    result.data.forEach(site => {
+                        const checked = assignedSiteIds.includes(site.id) ? 'checked' : '';
+                        html += `<div class="form-check">
+                            <input type="checkbox" class="site-checkbox" id="site-${site.id}" value="${site.id}" ${checked}>
+                            <label for="site-${site.id}">${escapeHtml(site.name)}</label>
+                        </div>`;
+                    });
+                    sitesContainer.innerHTML = html;
+                } else {
+                    sitesContainer.innerHTML = '<p class="error-message">Error al cargar sitios.</p>';
+                }
             } catch (error) {
                 sitesContainer.innerHTML = '<p class="error-message">Error al cargar sitios.</p>';
             }
         }
 
-        async function fetchAssignedSites(userId) {
-            try {
-                const result = await apiCall(`api/manage_users.php?action=get_assigned_sites&id=${userId}`);
-                if (result && result.success) {
-                    return result.data.map(s => s.id);
-                }
-                return [];
-            } catch (error) {
-                return [];
-            }
-        }
-
         // --- EMPRESAS ---
-        const companiesTableBody = document.querySelector('#companies-table tbody');
-        const companyModalEl = document.getElementById('company-modal');
+        const companiesTableBody = document.querySelector('#companies-table-body');
         const companyFormEl = document.getElementById('company-form');
 
         async function fetchCompanies() {
@@ -774,8 +679,8 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     <td>${escapeHtml(company.name)}</td>
                     <td>${safeDate(company.created_at)}</td>
                     <td class="actions">
-                        <a href="#" class="btn btn-secondary btn-sm edit-company-btn" data-id="${company.id}">Editar</a>
-                        <a href="#" class="btn btn-danger btn-sm delete-company-btn" data-id="${company.id}">Eliminar</a>
+                        <button class="btn btn-sm btn-secondary edit-company-btn" data-id="${company.id}">Editar</button>
+                        <button class="btn btn-sm btn-danger delete-company-btn" data-id="${company.id}">Eliminar</button>
                     </td>
                 `;
                 companiesTableBody.appendChild(tr);
@@ -791,6 +696,17 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         });
 
         companiesTableBody.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('delete-company-btn')) {
+                e.preventDefault();
+                if (!confirm('¿Eliminar esta empresa?')) return;
+                const id = e.target.dataset.id;
+                const result = await apiCall('api/manage_companies.php', 'POST', { action: 'delete', id });
+                if (result && result.success) {
+                    fetchCompanies();
+                    loadCompanies();
+                }
+            }
+
             if (e.target.classList.contains('edit-company-btn')) {
                 e.preventDefault();
                 const id = e.target.dataset.id;
@@ -819,8 +735,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         });
 
         // --- SUCURSALES ---
-        const branchesTableBody = document.querySelector('#branches-table tbody');
-        const branchModalEl = document.getElementById('branch-modal');
+        const branchesTableBody = document.querySelector('#branches-table-body');
         const branchFormEl = document.getElementById('branch-form');
 
         async function fetchBranches() {
@@ -833,7 +748,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         function renderBranchesTable(branches) {
             branchesTableBody.innerHTML = '';
             if (branches.length === 0) {
-                branchesTableBody.innerHTML = '<tr><td colspan="4">No hay sucursales para mostrar.</td></tr>';
+                branchesTableBody.innerHTML = '<tr><td colspan="5">No hay sucursales para mostrar.</td></tr>';
                 return;
             }
             branches.forEach(branch => {
@@ -841,10 +756,11 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                 tr.innerHTML = `
                     <td>${escapeHtml(branch.name)}</td>
                     <td>${escapeHtml(branch.company_name)}</td>
+                    <td>${escapeHtml(branch.country_name || 'N/A')}</td>
                     <td>${escapeHtml(branch.province)}</td>
                     <td class="actions">
-                        <a href="#" class="btn btn-secondary btn-sm edit-branch-btn" data-id="${branch.id}">Editar</a>
-                        <a href="#" class="btn btn-danger btn-sm delete-branch-btn" data-id="${branch.id}">Eliminar</a>
+                        <button class="btn btn-sm btn-secondary edit-branch-btn" data-id="${branch.id}">Editar</button>
+                        <button class="btn btn-sm btn-danger delete-branch-btn" data-id="${branch.id}">Eliminar</button>
                     </td>
                 `;
                 branchesTableBody.appendChild(tr);
@@ -857,10 +773,21 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             document.getElementById('branch-action').value = 'add';
             document.getElementById('branch-modal-title').textContent = 'Agregar Sucursal';
             loadBranchCompanies();
+            loadCountries();
             openModal('branch-modal');
         });
 
         branchesTableBody.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('delete-branch-btn')) {
+                e.preventDefault();
+                if (!confirm('¿Eliminar esta sucursal?')) return;
+                const id = e.target.dataset.id;
+                const result = await apiCall('api/manage_branches.php', 'POST', { action: 'delete', id });
+                if (result && result.success) {
+                    fetchBranches();
+                }
+            }
+
             if (e.target.classList.contains('edit-branch-btn')) {
                 e.preventDefault();
                 const id = e.target.dataset.id;
@@ -869,9 +796,10 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     document.getElementById('branch-modal-title').textContent = 'Editar Sucursal';
                     document.getElementById('branch-action').value = 'edit';
                     document.getElementById('branch-id').value = result.data.id;
-                    document.getElementById('branch-company-id').value = result.data.company_id;
                     document.getElementById('branch-name').value = result.data.name;
-                    document.getElementById('branch-province').value = result.data.province;
+                    document.getElementById('branch-company-id').value = result.data.company_id;
+                    loadBranchCompanies(result.data.company_id);
+                    loadCountries(result.data.country_id, result.data.province);
                     openModal('branch-modal');
                 }
             }
@@ -889,7 +817,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             }
         });
 
-        async function loadBranchCompanies() {
+        async function loadBranchCompanies(selectedId = null) {
             const select = document.getElementById('branch-company-id');
             select.innerHTML = '<option value="">Cargando...</option>';
             try {
@@ -900,6 +828,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                         const option = document.createElement('option');
                         option.value = company.id;
                         option.textContent = company.name;
+                        if (selectedId && company.id == selectedId) option.selected = true;
                         select.appendChild(option);
                     });
                 } else {
@@ -910,9 +839,146 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             }
         }
 
+        async function loadCountries(selectedCountryId = null, selectedProvinceName = null) {
+            const countrySelect = document.getElementById('branch-country-id');
+            const provinceSelect = document.getElementById('branch-province');
+            
+            try {
+                const result = await apiCall('api/get_countries.php');
+                if (result.success) {
+                    countrySelect.innerHTML = '<option value="">Seleccionar país</option>';
+                    result.data.forEach(country => {
+                        const option = document.createElement('option');
+                        option.value = country.id;
+                        option.textContent = country.name;
+                        if (selectedCountryId && country.id == selectedCountryId) option.selected = true;
+                        countrySelect.appendChild(option);
+                    });
+
+                    if (selectedCountryId) {
+                        await loadProvinces(selectedCountryId, selectedProvinceName);
+                    }
+                }
+            } catch (error) {
+                countrySelect.innerHTML = '<option value="">Error</option>';
+            }
+        }
+
+        async function loadProvinces(countryId, selectedProvinceName = null) {
+            const provinceSelect = document.getElementById('branch-province');
+            provinceSelect.innerHTML = '<option value="">Cargando...</option>';
+            try {
+                const result = await apiCall(`api/get_provinces.php?country_id=${countryId}`);
+                if (result.success) {
+                    provinceSelect.innerHTML = '<option value="">Seleccionar provincia</option>';
+                    result.data.forEach(province => {
+                        const option = document.createElement('option');
+                        option.value = province.name; // Storing name as value
+                        option.textContent = province.name;
+                        if (selectedProvinceName && province.name === selectedProvinceName) option.selected = true;
+                        provinceSelect.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                provinceSelect.innerHTML = '<option value="">Error</option>';
+            }
+        }
+
+        document.getElementById('branch-country-id').addEventListener('change', function() {
+            const countryId = this.value;
+            if (countryId) {
+                loadProvinces(countryId);
+            } else {
+                document.getElementById('branch-province').innerHTML = '<option value="">Seleccionar provincia</option>';
+            }
+        });
+
+        // --- SITIOS ---
+        const sitesTableBody = document.querySelector('#sites-table-body');
+        const siteForm = document.getElementById('site-form');
+
+        async function fetchSites() {
+            const result = await apiCall('api/manage_sites.php?action=list');
+            if (result && result.success) {
+                renderSitesTable(result.data);
+            }
+        }
+
+        function renderSitesTable(sites) {
+            sitesTableBody.innerHTML = '';
+            if (sites.length === 0) {
+                sitesTableBody.innerHTML = '<tr><td colspan="5">No hay sitios para mostrar.</td></tr>';
+                return;
+            }
+            sites.forEach(site => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(site.name)}</td>
+                    <td><a href="${site.url}" target="_blank">${escapeHtml(site.url)}</a></td>
+                    <td>${escapeHtml(site.username)}</td>
+                    <td>${site.password_needs_update ? '✅ Sí' : '❌ No'}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-secondary edit-site-btn" data-site-id="${site.id}">Editar</button>
+                        <button class="btn btn-sm btn-danger delete-site-btn" data-site-id="${site.id}">Eliminar</button>
+                    </td>
+                `;
+                sitesTableBody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('add-site-btn').addEventListener('click', () => {
+            siteForm.reset();
+            document.getElementById('site-id').value = '';
+            document.getElementById('site-action').value = 'add';
+            document.getElementById('site-modal-title').textContent = 'Agregar Sitio';
+            openModal('site-modal');
+        });
+
+        sitesTableBody.addEventListener('click', async (e) => {
+            if (e.target.classList.contains('edit-site-btn')) {
+                e.preventDefault();
+                const id = e.target.dataset.siteId;
+                const result = await apiCall(`api/manage_sites.php?action=get&id=${id}`);
+                if (result && result.success) {
+                    const site = result.data;
+                    siteForm.reset();
+                    document.getElementById('site-modal-title').textContent = 'Editar Sitio';
+                    document.getElementById('site-action').value = 'edit';
+                    document.getElementById('site-id').value = site.id;
+                    document.getElementById('site-name').value = site.name;
+                    document.getElementById('site-url').value = site.url;
+                    document.getElementById('site-username').value = site.username;
+                    document.getElementById('site-notes').value = site.notes;
+                    document.getElementById('site-password-needs-update').checked = site.password_needs_update == 1;
+                    openModal('site-modal');
+                }
+            }
+
+            if (e.target.classList.contains('delete-site-btn')) {
+                e.preventDefault();
+                if (!confirm('¿Eliminar este sitio? Esta acción no se puede deshacer.')) return;
+                const id = e.target.dataset.siteId;
+                const result = await apiCall('api/manage_sites.php', 'POST', { action: 'delete', id: id });
+                if (result && result.success) {
+                    fetchSites();
+                }
+            }
+        });
+
+        siteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(siteForm);
+            const data = Object.fromEntries(formData.entries());
+            data.id = parseInt(data.id) || null;
+            const result = await apiCall('api/manage_sites.php', 'POST', data);
+            if (result && result.success) {
+                closeModal('site-modal');
+                fetchSites();
+            }
+        });
+
         // --- MENSAJES ---
         const messagesTableBody = document.getElementById('messages-table-body');
-
         document.querySelector('[data-tab="messages-tab"]').addEventListener('click', () => {
             fetchUserMessages();
         });
@@ -921,37 +987,31 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             try {
                 const result = await apiCall('api/get_user_messages.php');
                 if (result.success) {
-                    renderMessagesTable(result.data);
+                    messagesTableBody.innerHTML = '';
+                    result.data.forEach(msg => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${escapeHtml(msg.username)}</td>
+                            <td>${escapeHtml(msg.message)}</td>
+                            <td>${safeDate(msg.created_at)}</td>
+                            <td class="actions">
+                                <button class="btn btn-sm btn-primary reply-btn" data-user-id="${msg.sender_id}">Responder</button>
+                                <button class="btn btn-sm btn-danger delete-msg-btn" data-id="${msg.id}">Eliminar</button>
+                            </td>
+                        `;
+                        messagesTableBody.appendChild(tr);
+                    });
                 }
             } catch (error) {
-                messagesTableBody.innerHTML = '<tr><td colspan="4">Error de conexión.</td></tr>';
+                messagesTableBody.innerHTML = '<tr><td colspan="4">Error al cargar mensajes.</td></tr>';
             }
-        }
-
-        function renderMessagesTable(messages) {
-            if (messages.length === 0) {
-                messagesTableBody.innerHTML = '<tr><td colspan="4">No hay mensajes.</td></tr>';
-                return;
-            }
-            messagesTableBody.innerHTML = messages.map(msg => `
-                <tr>
-                    <td>${escapeHtml(msg.username)}</td>
-                    <td title="${escapeHtml(msg.message)}">${escapeHtml(msg.message.substring(0, 60))}${msg.message.length > 60 ? '...' : ''}</td>
-                    <td>${safeDate(msg.created_at)}</td>
-                    <td class="actions">
-                        <a href="#" class="btn btn-secondary btn-sm reply-btn" data-user-id="${msg.sender_id}" data-username="${escapeHtml(msg.username)}">Responder</a>
-                        <a href="#" class="btn btn-danger btn-sm delete-msg-btn" data-id="${msg.id}">Eliminar</a>
-                    </td>
-                </tr>
-            `).join('');
         }
 
         messagesTableBody.addEventListener('click', async (e) => {
             if (e.target.classList.contains('reply-btn')) {
                 e.preventDefault();
                 const userId = e.target.dataset.userId;
-                const username = e.target.dataset.username;
-                const reply = prompt(`Responder a ${username}:`);
+                const reply = prompt('Escriba su respuesta:');
                 if (reply && reply.trim()) {
                     const result = await apiCall('api/send_message.php', 'POST', {
                         receiver_id: userId,
@@ -963,6 +1023,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     }
                 }
             }
+
             if (e.target.classList.contains('delete-msg-btn')) {
                 e.preventDefault();
                 if (!confirm('¿Eliminar este mensaje?')) return;
@@ -979,6 +1040,49 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         fetchSites();
         fetchCompanies();
         fetchBranches();
+        // --- AUDITORÍA ---
+    const auditTableBody = document.getElementById('audit-table-body');
+
+    async function fetchAuditLogs() {
+        try {
+            const result = await apiCall('api/get_audit_logs.php');
+            if (result.success) {
+                renderAuditTable(result.data);
+            }
+        } catch (error) {
+            auditTableBody.innerHTML = '<tr><td colspan="6">Error al cargar la bitácora.</td></tr>';
+        }
+    }
+
+    function renderAuditTable(logs) {
+        auditTableBody.innerHTML = '';
+        if (logs.length === 0) {
+            auditTableBody.innerHTML = '<tr><td colspan="6">No hay registros en la bitácora.</td></tr>';
+            return;
+        }
+        logs.forEach(log => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${log.id}</td>
+                <td>${escapeHtml(log.username || 'Sistema')}</td>
+                <td>${escapeHtml(log.action)}</td>
+                <td>${escapeHtml(log.service_name || '-')}</td>
+                <td><code>${escapeHtml(log.ip_address || 'N/A')}</code></td>
+                <td>${safeDate(log.timestamp)}</td>
+            `;
+            auditTableBody.appendChild(tr);
+        });
+    }
+
+    // Cargar auditoría cuando se haga clic en la pestaña
+    document.querySelector('[data-tab="audit-tab"]').addEventListener('click', () => {
+        fetchAuditLogs();
+});
+
+        // --- INICIALIZAR NOTIFICACIONES ---
+        document.querySelector('[data-tab="notifications-tab"]').addEventListener('click', () => {
+            // El script externo notifications_panel.js se encarga
+        });
     });
     </script>
     <script src="assets/js/notifications_panel.js"></script>

@@ -17,18 +17,22 @@ try {
     
     if ($company_id) {
         $stmt = $pdo->prepare("
-            SELECT b.*, c.name as company_name 
-            FROM branches b 
-            LEFT JOIN companies c ON b.company_id = c.id 
-            WHERE b.company_id = ? 
+            SELECT b.id, b.name, b.province, b.company_id, c.name as company_name, co.name as country_name
+            FROM branches b
+            LEFT JOIN companies c ON b.company_id = c.id
+            LEFT JOIN provinces p ON b.province = p.name
+            LEFT JOIN countries co ON p.country_id = co.id
+            WHERE b.company_id = ?
             ORDER BY b.name ASC
         ");
         $stmt->execute([$company_id]);
     } else {
         $stmt = $pdo->query("
-            SELECT b.*, c.name as company_name 
-            FROM branches b 
-            LEFT JOIN companies c ON b.company_id = c.id 
+            SELECT b.id, b.name, b.province, b.company_id, c.name as company_name, co.name as country_name
+            FROM branches b
+            LEFT JOIN companies c ON b.company_id = c.id
+            LEFT JOIN provinces p ON b.province = p.name
+            LEFT JOIN countries co ON p.country_id = co.id
             ORDER BY c.name ASC, b.name ASC
         ");
     }

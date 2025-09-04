@@ -9,13 +9,21 @@ header('Content-Type: application/json');
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo = get_pdo_connection();
 
+// Validar CSRF para POST
+$csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if ($method === 'POST' && !verify_csrf_token($csrf_token)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido']);
+    exit;
+}
+
 try {
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
-        
-        if (!$input) {
+
+        if (json_last_error() !== JSON_ERROR_NONE) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Datos inválidos']);
+            echo json_encode(['success' => false, 'message' => 'JSON inválido']);
             exit;
         }
         
@@ -23,6 +31,26 @@ try {
         $name = trim($input['name'] ?? '');
         $company_id = (int)($input['company_id'] ?? 0);
         $province = trim($input['province'] ?? '');
+
+        if ($action === 'delete') {
+            $id = (int)($input['id'] ?? 0);
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'ID inválido']);
+                exit;
+            }
+            $stmt = $pdo->prepare("DELETE FROM branches WHERE id = ?");
+            $stmt->execute([$id]);
+
+            if ($stmt->rowCount() > 0) {
+                log_action($pdo, $_SESSION['user_id'], null, 'branch_deleted', $_SERVER['REMOTE_ADDR']);
+                echo json_encode(['success' => true, 'message' => 'Sucursal eliminada']);
+            } else {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Sucursal no encontrada.']);
+            }
+            exit;
+        }
         
         if (empty($name) || !$company_id || empty($province)) {
             http_response_code(400);

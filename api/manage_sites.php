@@ -16,7 +16,7 @@ $pdo = get_pdo_connection();
 
 // Validar CSRF
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if ($method === 'POST' && !verify_csrf_token($csrf_token)) {
+if (($method === 'POST' || $method === 'DELETE') && !verify_csrf_token($csrf_token)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Token CSRF inválido']);
     ob_end_flush();
@@ -100,6 +100,19 @@ try {
             $needs_update = !empty($input['password_needs_update']) ? 1 : 0;
             $notes = $input['notes'] ?? null;
             $created_by = $_SESSION['user_id'] ?? 1;
+
+            if ($action === 'delete') {
+                if (!$id) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'ID no proporcionado']);
+                    ob_end_flush();
+                    exit;
+                }
+                $stmt = $pdo->prepare("DELETE FROM sites WHERE id = ?");
+                $stmt->execute([$id]);
+                echo json_encode(['success' => true, 'message' => 'Sitio eliminado']);
+                exit;
+            }
 
             if (empty($name) || empty($url)) {
                 http_response_code(400);

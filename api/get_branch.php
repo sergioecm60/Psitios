@@ -16,7 +16,12 @@ try {
     }
 
     $pdo = get_pdo_connection();
-    $stmt = $pdo->prepare("SELECT * FROM branches WHERE id = ?");
+    $stmt = $pdo->prepare("
+        SELECT b.*, p.country_id
+        FROM branches b
+        LEFT JOIN provinces p ON b.province = p.name
+        WHERE b.id = ?
+    ");
     $stmt->execute([$id]);
     $branch = $stmt->fetch(PDO::FETCH_ASSOC);
 

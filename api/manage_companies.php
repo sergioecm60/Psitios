@@ -35,6 +35,28 @@ try {
         $action = $input['action'] ?? '';
         $name = trim($input['name'] ?? '');
 
+        if ($action === 'delete') {
+            $id = (int)($input['id'] ?? 0);
+            if (!$id) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'ID inválido']);
+                ob_end_flush();
+                exit;
+            }
+            $stmt = $pdo->prepare("DELETE FROM companies WHERE id = ?");
+            $stmt->execute([$id]);
+
+            if ($stmt->rowCount() > 0) {
+                log_action($pdo, $_SESSION['user_id'], null, 'company_deleted', $_SERVER['REMOTE_ADDR']);
+                echo json_encode(['success' => true, 'message' => 'Empresa eliminada']);
+            } else {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'message' => 'Empresa no encontrada.']);
+            }
+            ob_end_flush();
+            exit;
+        }
+
         if (empty($name)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Nombre requerido']);

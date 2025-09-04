@@ -56,6 +56,24 @@ function get_pdo_connection() {
     return $pdo;
 }
 
+// Función para registrar acciones en la bitácora de auditoría
+function log_action($pdo, $user_id, $service_id, $action, $ip_address) {
+    try {
+        $stmt = $pdo->prepare(
+            "INSERT INTO audit_logs (user_id, service_id, action, ip_address, timestamp) 
+             VALUES (:user_id, :service_id, :action, :ip_address, NOW())"
+        );
+        $stmt->execute([
+            ':user_id' => $user_id,
+            ':service_id' => $service_id,
+            ':action' => $action,
+            ':ip_address' => $ip_address
+        ]);
+    } catch (Exception $e) {
+        // Registrar en el log de errores del servidor, pero no interrumpir la solicitud principal.
+        error_log("Fallo al registrar la acción de auditoría: " . $e->getMessage());
+    }
+}
 // Función para verificar si estamos en una petición AJAX/API
 function is_api_request() {
     return isset($_SERVER['HTTP_X_REQUESTED_WITH']) && 
