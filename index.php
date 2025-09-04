@@ -1,9 +1,12 @@
 <?php
 /**
  * index.php
- * Página de inicio de sesión para Secure Panel.
+ * Página de inicio de sesión para Psitios.
  */
 require_once 'bootstrap.php';
+
+// Generar un token CSRF para el formulario de login si no existe.
+generate_csrf_token();
 
 // Si el usuario ya está logueado, redirigir al panel correspondiente.
 if (isset($_SESSION['user_id'])) {
@@ -19,6 +22,7 @@ if (isset($_SESSION['user_id'])) {
     <meta name="csrf-token" content="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Acceso Seguro</title>
+    <link rel="icon" href="<?= BASE_URL ?>favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/css/main.css">
 </head>
 <body class="login-page">

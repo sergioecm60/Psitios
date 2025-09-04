@@ -5,6 +5,7 @@ if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
+$user_role = $_SESSION['user_role'] ?? 'user';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -12,6 +13,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Administración</title>
+    <link rel="icon" href="<?= BASE_URL ?>favicon.ico" type="image/x-icon">
     <meta name="csrf-token" content="<?php echo $csrf_token; ?>">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f7f9; margin: 0; color: #333; }
@@ -72,8 +74,10 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
         <nav class="tab-nav">
             <button class="tab-link" data-tab="audit-tab">📋 Auditoría</button>
             <button class="tab-link active" data-tab="users-tab">Usuarios</button>
+            <?php if ($user_role === 'superadmin'): ?>
             <button class="tab-link" data-tab="companies-tab">🏢 Empresas</button>
             <button class="tab-link" data-tab="branches-tab">📍 Sucursales</button>
+            <?php endif; ?>
             <button class="tab-link" data-tab="sites-tab">Sitios</button>
             <button class="tab-link" data-tab="messages-tab">💬 Mensajes</button>
             <button class="tab-link" data-tab="notifications-tab">Notificaciones</button>
@@ -101,6 +105,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             </div>
         </div>
 
+        <?php if ($user_role === 'superadmin'): ?>
         <!-- Pestaña de Empresas -->
         <div id="companies-tab" class="tab-content">
             <h2>🏢 Gestión de Empresas</h2>
@@ -138,6 +143,7 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                 </table>
             </div>
         </div>
+        <?php endif; ?>
 
         <!-- Pestaña de Sitios -->
         <div id="sites-tab" class="tab-content">
@@ -341,12 +347,9 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     </div>
                     <small>Deje en blanco para mantener la contraseña actual.</small>
                 </div>
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="site-password-needs-update" name="password_needs_update" value="1">
-                        Marcar como "requiere actualización"
-                    </label>
-                    <small>El usuario verá un aviso en su panel.</small>
+                <div class="form-group" id="site-visibility-group" style="display: none;">
+                    <label for="site-visibility">Visibilidad</label>
+                    <select id="site-visibility" name="visibility"><option value="private">Privado (Solo para mí)</option><option value="shared">Compartido (Para todos los admins)</option></select>
                 </div>
                 <div class="form-group">
                     <label for="site-notes">Notas</label>
@@ -381,6 +384,9 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 
     <script>
     const CSRF_TOKEN = '<?php echo $csrf_token; ?>';
+    const CURRENT_USER_ROLE = '<?php echo $_SESSION['user_role']; ?>';
+    const CURRENT_USER_COMPANY_ID = '<?php echo $_SESSION['company_id'] ?? ''; ?>';
+    const CURRENT_USER_BRANCH_ID = '<?php echo $_SESSION['branch_id'] ?? ''; ?>';
 
     // Se mueve fuera para que sea accesible globalmente por los atributos onclick=""
     function closeModal(modalId) {
@@ -509,6 +515,13 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             document.getElementById('is_active').checked = true;
             loadCompanies();
             loadSitesForUser();
+
+            if (CURRENT_USER_ROLE === 'admin') {
+                document.getElementById('company_id').value = CURRENT_USER_COMPANY_ID;
+                document.getElementById('branch_id').value = CURRENT_USER_BRANCH_ID;
+                document.getElementById('company_id').disabled = true;
+                document.getElementById('branch_id').disabled = true;
+            }
             openModal('user-modal');
         });
 
@@ -539,6 +552,12 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     loadCompanies(user.company_id);
                     loadBranches(user.company_id, user.branch_id);
                     setTimeout(() => loadSitesForUser(user.id), 300);
+
+                    if (CURRENT_USER_ROLE === 'admin') {
+                        document.getElementById('company_id').disabled = true;
+                        document.getElementById('branch_id').disabled = true;
+                    }
+
                     openModal('user-modal');
                 }
             }
@@ -931,6 +950,10 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
             document.getElementById('site-id').value = '';
             document.getElementById('site-action').value = 'add';
             document.getElementById('site-modal-title').textContent = 'Agregar Sitio';
+            // Mostrar selector de visibilidad solo para superadmin
+            if (CURRENT_USER_ROLE === 'superadmin') {
+                document.getElementById('site-visibility-group').style.display = 'block';
+            }
             openModal('site-modal');
         });
 
@@ -949,7 +972,6 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     document.getElementById('site-url').value = site.url;
                     document.getElementById('site-username').value = site.username;
                     document.getElementById('site-notes').value = site.notes;
-                    document.getElementById('site-password-needs-update').checked = site.password_needs_update == 1;
                     openModal('site-modal');
                 }
             }

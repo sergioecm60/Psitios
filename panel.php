@@ -22,7 +22,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mis Sitios</title>
-    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="icon" href="<?= BASE_URL ?>favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/css/main.css">
 
     <!-- Estilos con nonce (seguro para CSP) -->

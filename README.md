@@ -1,25 +1,41 @@
-# Psitios - Panel de Gestión Segura
+# Psitios - Panel de Gestión Segura y Jerárquica
 
-Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso de múltiples usuarios a diferentes sitios o servicios web, centralizando y protegiendo las credenciales.
+Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso de múltiples usuarios a diferentes sitios o servicios web. El sistema está diseñado con una arquitectura jerárquica de roles (`SuperAdmin`, `Admin`, `Usuario`) que permite un aislamiento de datos efectivo, ideal para entornos multi-cliente o con múltiples sucursales.
 
-## Características Principales
+## ✨ Características Principales
 
-*   **Gestión de Usuarios:** Creación de usuarios con roles de `administrador` o `usuario`. Los administradores pueden asignar usuarios y ver a todos los clientes.
-*   **Gestión de Sitios:** Almacena de forma centralizada los datos de acceso (URL, usuario, contraseña) a diferentes plataformas (ej. Proxmox, Cloud Panels, etc.).
-*   **Credenciales Seguras:** Las contraseñas de los sitios se almacenan **encriptadas** en la base de datos para máxima seguridad.
-*   **Control de Acceso:** Asigna permisos a los usuarios para que solo puedan ver y acceder a los sitios que les corresponden a través de "Servicios".
-*   **Sistema de Notificaciones:** Alerta a los usuarios sobre eventos importantes, como la asignación de un nuevo servicio o problemas reportados.
-*   **Mensajería Interna:** Permite la comunicación directa y segura entre usuarios del panel.
-*   **Registro de Auditoría:** Guarda un log de las acciones importantes realizadas en el panel (quién, qué, cuándo y desde dónde) para un seguimiento completo.
+*   **Gestión Jerárquica de Roles:**
+    *   **SuperAdmin:** Control total sobre el sistema, incluyendo la gestión de empresas, sucursales y todos los usuarios.
+    *   **Admin:** Gestiona una empresa/sucursal específica, con visibilidad de datos aislada a su propio ámbito.
+    *   **Usuario:** Rol final que accede a los servicios que su administrador le asigna.
+*   **Bóveda Segura de Credenciales:**
+    *   Las contraseñas de los sitios se almacenan en la base de datos utilizando encriptación fuerte **AES-256-CBC**.
+    *   Las contraseñas de los usuarios del panel se hashean con el algoritmo moderno y seguro **Argon2ID**.
+*   **Aislamiento de Datos (Multi-Tenant):**
+    *   Un `Admin` solo puede ver y gestionar los usuarios, sitios y mensajes pertenecientes a su sucursal, garantizando la privacidad entre diferentes clientes o departamentos.
+*   **Gestión Avanzada de Sitios:**
+    *   Los `Admins` pueden crear sitios `privados` para su uso exclusivo.
+    *   El `SuperAdmin` puede crear sitios `compartidos` que pueden ser asignados por cualquier `Admin` a sus usuarios.
+*   **Comunicación Integrada:**
+    *   Sistema de chat directo y seguro entre los `Usuarios` y su `Admin` creador.
+*   **Sistema de Notificaciones y Alertas:**
+    *   Los usuarios pueden reportar problemas de acceso o notificar sobre contraseñas expiradas directamente a su administrador.
+    *   Panel de notificaciones centralizado para que los administradores gestionen las incidencias.
+*   **Auditoría Completa:**
+    *   Registro detallado de acciones críticas (creación, edición, eliminación) para un seguimiento de seguridad completo.
 
-## Stack Tecnológico
+## 🛠️ Stack Tecnológico
 
 *   **Backend:** PHP 8.3+
-*   **Base de Datos:** MySQL 8.x (o compatible, como Percona Server)
-*   **Gestión de Dependencias:** Composer
-*   **Variables de Entorno:** vlucas/phpdotenv
+*   **Base de Datos:** MySQL 8.x / Percona Server
+*   **Frontend:** JavaScript (ES6+) asíncrono con Fetch API.
+*   **Seguridad:**
+    *   **Hashing de Contraseñas:** `Argon2ID`
+    *   **Encriptación de Datos:** `AES-256-CBC`
+    *   **Protección Web:** CSRF Tokens en todas las peticiones que modifican datos, y Content-Security-Policy (CSP) con Nonce en el panel de usuario.
+    *   **Base de Datos:** Uso exclusivo de Prepared Statements (PDO) para prevenir inyección SQL.
 
-## Instalación y Configuración
+## 🚀 Instalación y Configuración
 
 Sigue estos pasos para poner en marcha el proyecto en tu entorno de desarrollo (como Laragon).
 

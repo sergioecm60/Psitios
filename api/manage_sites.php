@@ -27,18 +27,24 @@ try {
     switch ($method) {
         case 'GET':
             if (isset($_GET['action']) && $_GET['action'] === 'list') {
-                $stmt = $pdo->query("
-                    SELECT 
-                        id,
-                        name,
-                        url,
-                        username,
-                        password_needs_update,
-                        notes,
-                        created_by
-                    FROM sites 
-                    ORDER BY name ASC
-                ");
+                $user_role = $_SESSION['user_role'];
+                $user_id = $_SESSION['user_id'];
+
+                $sql = "SELECT id, name, url, username, password_needs_update, notes, created_by FROM sites";
+                $params = [];
+
+                if ($user_role === 'admin') {
+                    // Admin ve sus sitios privados y los compartidos
+                    $sql .= " WHERE (created_by = ? AND visibility = 'private') OR visibility = 'shared'";
+                    $params[] = $user_id;
+                }
+                // SuperAdmin ve todo, no necesita WHERE
+
+                $sql .= " ORDER BY name ASC";
+                
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+
                 $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 // Asegurar que no haya valores nulos
@@ -99,7 +105,8 @@ try {
             $password = $input['password'] ?? null;
             $needs_update = !empty($input['password_needs_update']) ? 1 : 0;
             $notes = $input['notes'] ?? null;
-            $created_by = $_SESSION['user_id'] ?? 1;
+            $created_by = $_SESSION['user_id'];
+            $visibility = ($_SESSION['user_role'] === 'superadmin' && !empty($input['visibility'])) ? $input['visibility'] : 'private';
 
             if ($action === 'delete') {
                 if (!$id) {
@@ -146,10 +153,10 @@ try {
             } else {
                 // Crear
                 $stmt = $pdo->prepare("
-                    INSERT INTO sites (name, url, username, password_needs_update, notes, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO sites (name, url, username, password_needs_update, notes, created_by, visibility)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$name, $url, $username, $needs_update, $notes, $created_by]);
+                $stmt->execute([$name, $url, $username, $needs_update, $notes, $created_by, $visibility]);
                 $newId = $pdo->lastInsertId();
                 echo json_encode(['success' => true, 'message' => 'Sitio creado', 'id' => (int)$newId]);
             }

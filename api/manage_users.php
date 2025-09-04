@@ -29,17 +29,22 @@ try {
             $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
             if ($action === 'list') {
-                $stmt = $pdo->query("
-                    SELECT 
-                        u.id, u.username, u.role, u.is_active, u.created_at,
-                        c.name as company_name,
-                        b.name as branch_name,
-                        b.province
+                $user_role = $_SESSION['user_role'] ?? 'user';
+                $base_query = "
+                    SELECT u.id, u.username, u.role, u.is_active, u.created_at,
+                           c.name as company_name, b.name as branch_name, b.province
                     FROM users u
                     LEFT JOIN companies c ON u.company_id = c.id
-                    LEFT JOIN branches b ON u.branch_id = b.id
-                    ORDER BY u.username ASC
-                ");
+                    LEFT JOIN branches b ON u.branch_id = b.id";
+
+                if ($user_role === 'admin') {
+                    // Admin solo ve usuarios que él creó en su sucursal
+                    $stmt = $pdo->prepare($base_query . " WHERE u.created_by = ? ORDER BY u.username ASC");
+                    $stmt->execute([$_SESSION['user_id']]);
+                } else { // SuperAdmin ve todo
+                    $stmt = $pdo->query($base_query . " ORDER BY u.username ASC");
+                }
+
                 $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                 foreach ($users as &$user) {
@@ -99,6 +104,14 @@ try {
             $company_id = $input['company_id'] ?? null;
             $branch_id = $input['branch_id'] ?? null;
             $assigned_sites = $input['assigned_sites'] ?? [];
+            $current_user_role = $_SESSION['user_role'];
+
+            // Un admin solo puede crear usuarios en su propia empresa/sucursal
+            if ($current_user_role === 'admin') {
+                $company_id = $_SESSION['company_id'];
+                $branch_id = $_SESSION['branch_id'];
+                $role = 'user'; // Un admin solo puede crear usuarios, no otros admins.
+            }
  
             if ($action === 'delete') {
                 if (!$id) {
@@ -147,7 +160,7 @@ try {
                 }
 
                 $sql = "UPDATE users SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?";
-                $params = [$username, $role, $is_active, $company_id ?: null, $branch_id ?: null];
+                $params = [$username, $role, $is_active, $company_id, $branch_id];
 
                 if (!empty($password)) {
                     $password_hash = password_hash($password, PASSWORD_DEFAULT);
@@ -184,11 +197,12 @@ try {
 
                 $password_hash = $password ? password_hash($password, PASSWORD_DEFAULT) : password_hash('temp123', PASSWORD_DEFAULT);
 
+                $created_by = $_SESSION['user_id'];
                 $stmt = $pdo->prepare("
-                    INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$username, $password_hash, $role, $is_active, $company_id ?: null, $branch_id ?: null]);
+                $stmt->execute([$username, $password_hash, $role, $is_active, $company_id, $branch_id, $created_by]);
                 $newId = $pdo->lastInsertId();
 
                 // Asignar sitios

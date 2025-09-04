@@ -2,7 +2,8 @@
 /**
  * bootstrap.php
  */
-
+// Establecer zona horaria a Buenos Aires
+date_default_timezone_set('America/Argentina/Buenos_Aires');
 declare(strict_types=1);
 
 ob_start();
