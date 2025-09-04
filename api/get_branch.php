@@ -1,7 +1,7 @@
 
 <?php
-//================================
-// api/get_company.php
+// ===============================
+// api/get_branch.php
 // ===============================
 require_once __DIR__ . '/../bootstrap.php';
 require_auth('admin');
@@ -16,19 +16,19 @@ try {
     }
 
     $pdo = get_pdo_connection();
-    $stmt = $pdo->prepare("SELECT * FROM companies WHERE id = ?");
+    $stmt = $pdo->prepare("SELECT * FROM branches WHERE id = ?");
     $stmt->execute([$id]);
-    $company = $stmt->fetch(PDO::FETCH_ASSOC);
+    $branch = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$company) {
+    if (!$branch) {
         http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'Empresa no encontrada']);
+        echo json_encode(['success' => false, 'message' => 'Sucursal no encontrada']);
         exit;
     }
 
-    echo json_encode(['success' => true, 'data' => $company]);
+    echo json_encode(['success' => true, 'data' => $branch]);
 } catch (Exception $e) {
-    error_log("Error en get_company.php: " . $e->getMessage());
+    error_log("Error en get_branch.php: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error interno']);
 }

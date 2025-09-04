@@ -1,0 +1,16 @@
+{
+    "name": "vlucas/phpdotenv",
+    "description": "composer",
+    "autoload": {
+        "psr-4": {
+            "Vlucas\\Phpdotenv\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "sergioecm60",
+            "email": "sergiomiers@gmail.com"
+        }
+    ],
+    "require": {}
+}

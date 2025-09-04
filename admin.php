@@ -295,7 +295,6 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                     <label for="branch-province">Provincia</label>
                     <select id="branch-province" name="province" required>
                         <option value="">Seleccionar provincia</option>
-                        <!-- Argentina -->
                         <optgroup label="Argentina">
                             <option value="Buenos Aires">Buenos Aires</option>
                             <option value="Córdoba">Córdoba</option>
@@ -319,7 +318,6 @@ $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
                             <option value="Santa Cruz">Santa Cruz</option>
                             <option value="Tierra del Fuego">Tierra del Fuego</option>
                         </optgroup>
-                        <!-- Uruguay -->
                         <optgroup label="Uruguay">
                             <option value="Montevideo">Montevideo</option>
                             <option value="Canelones">Canelones</option>
