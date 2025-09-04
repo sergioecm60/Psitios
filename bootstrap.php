@@ -1,10 +1,10 @@
 <?php
+declare(strict_types=1);
 /**
  * bootstrap.php
  */
 // Establecer zona horaria a Buenos Aires
 date_default_timezone_set('America/Argentina/Buenos_Aires');
-declare(strict_types=1);
 
 ob_start();
 
@@ -106,20 +106,3 @@ set_exception_handler(function($exception) {
     }
     throw $exception; // Re-lanzar para peticiones web normales
 });
-
-// Función para obtener clave de encriptación
-function get_encryption_key() {
-    // Si tienes un archivo .env, intenta cargarlo
-    $envFile = __DIR__ . '/.env';
-    if (file_exists($envFile)) {
-        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            if (strpos($line, 'ENCRYPTION_KEY=') === 0) {
-                return trim(substr($line, 15));
-            }
-        }
-    }
-    
-    // Fallback: clave por defecto (CÁMBIALA por una única)
-    return 'tu_clave_unica_de_32_caracteres__';
-}
