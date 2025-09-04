@@ -1,25 +1,56 @@
 <?php
 // api/notifications_api.php
 
-header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-cache, must-revalidate');
+// Asegurar que no haya salida antes del JSON
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
 
+// Cabeceras para API JSON
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
+
+// Para entornos con CORS (opcional)
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-CSRF-TOKEN');
+
+// Iniciar sesión si no está activa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Validar autenticación
 if (!isset($_SESSION['user_id'])) {
     http_response_code(401);
     echo json_encode([
         'success' => false,
         'message' => 'Usuario no autenticado'
     ]);
+    ob_end_flush(); // Asegurar salida limpia
     exit;
 }
 
-require_once '../config/database.php';
+// Cargar conexión a la base de datos
+require_once '../bootstrap.php';
 
-// Validar token CSRF
+try {
+    $pdo = get_pdo_connection();
+} catch (Exception $e) {
+    error_log("Error de conexión a DB en notifications_api.php: " . $e->getMessage());
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Error de conexión a la base de datos'
+    ]);
+    ob_end_flush();
+    exit;
+}
+
+// Validar token CSRF (solo para POST)
 function validateCsrfToken() {
     $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
     $sessionToken = $_SESSION['csrf_token'] ?? null;
@@ -30,23 +61,18 @@ function validateCsrfToken() {
             'success' => false,
             'message' => 'Token CSRF inválido'
         ]);
+        ob_end_flush();
         exit;
     }
 }
 
-try {
-    $pdo = get_pdo_connection();
-} catch (Exception $e) {
-    error_log("Error de conexión a DB: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error de conexión a la base de datos'
-    ]);
-    exit;
-}
-
+// Manejar métodos HTTP
 switch ($_SERVER['REQUEST_METHOD']) {
+    case 'OPTIONS':
+        // Preflight CORS
+        http_response_code(200);
+        exit;
+
     case 'GET':
         try {
             $stmt = $pdo->prepare("
@@ -70,9 +96,9 @@ switch ($_SERVER['REQUEST_METHOD']) {
 
             foreach ($notifications as &$n) {
                 $n['is_read'] = (bool) $n['is_read'];
-                $n['created_at'] = date('Y-m-d H:i:s', strtotime($n['created_at']));
+                $n['created_at'] = date('c', strtotime($n['created_at'])); // ISO 8601
                 if ($n['resolved_at']) {
-                    $n['resolved_at'] = date('Y-m-d H:i:s', strtotime($n['resolved_at']));
+                    $n['resolved_at'] = date('c', strtotime($n['resolved_at']));
                 }
                 $n['title'] = $n['site_name'] 
                     ? 'Notificación: ' . $n['site_name'] 
@@ -84,6 +110,7 @@ switch ($_SERVER['REQUEST_METHOD']) {
                 'notifications' => $notifications,
                 'count' => count($notifications)
             ], JSON_UNESCAPED_UNICODE);
+
         } catch (Exception $e) {
             error_log("Error al obtener notificaciones: " . $e->getMessage());
             http_response_code(500);
@@ -101,13 +128,13 @@ switch ($_SERVER['REQUEST_METHOD']) {
         if (json_last_error() !== JSON_ERROR_NONE) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'JSON inválido']);
-            exit;
+            break;
         }
 
         if (!isset($input['action'])) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Acción requerida']);
-            exit;
+            break;
         }
 
         switch ($input['action']) {
@@ -116,24 +143,16 @@ switch ($_SERVER['REQUEST_METHOD']) {
                 if (!$id) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'message' => 'ID requerido']);
-                    exit;
+                    break;
                 }
-
                 try {
                     $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?");
                     $stmt->execute([$id, $_SESSION['user_id']]);
-                    
-                    echo json_encode([
-                        'success' => true, 
-                        'message' => 'Notificación marcada como leída'
-                    ]);
+                    echo json_encode(['success' => true, 'message' => 'Marcada como leída']);
                 } catch (Exception $e) {
                     error_log("Error al marcar como leída: " . $e->getMessage());
                     http_response_code(500);
-                    echo json_encode([
-                        'success' => false, 
-                        'message' => 'Error interno del servidor'
-                    ]);
+                    echo json_encode(['success' => false, 'message' => 'Error interno']);
                 }
                 break;
 
@@ -142,71 +161,53 @@ switch ($_SERVER['REQUEST_METHOD']) {
                     $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0");
                     $stmt->execute([$_SESSION['user_id']]);
                     $count = $stmt->rowCount();
-
                     echo json_encode([
                         'success' => true,
-                        'message' => $count > 0 
-                            ? "Se marcaron $count notificaciones como leídas" 
-                            : "No había notificaciones sin leer"
+                        'message' => $count > 0 ? "Marcadas $count como leídas" : "No había notificaciones sin leer"
                     ]);
                 } catch (Exception $e) {
                     error_log("Error al marcar todas como leídas: " . $e->getMessage());
                     http_response_code(500);
-                    echo json_encode([
-                        'success' => false, 
-                        'message' => 'Error interno del servidor'
-                    ]);
+                    echo json_encode(['success' => false, 'message' => 'Error interno']);
                 }
                 break;
 
-            // ✅ Nueva acción: Eliminar notificación
             case 'delete':
                 $id = $input['notification_id'] ?? null;
                 if (!$id) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'message' => 'ID requerido']);
-                    exit;
+                    break;
                 }
-
                 try {
                     $stmt = $pdo->prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?");
                     $stmt->execute([$id, $_SESSION['user_id']]);
-                    
                     if ($stmt->rowCount() > 0) {
-                        echo json_encode([
-                            'success' => true, 
-                            'message' => 'Notificación eliminada'
-                        ]);
+                        echo json_encode(['success' => true, 'message' => 'Notificación eliminada']);
                     } else {
                         http_response_code(404);
-                        echo json_encode([
-                            'success' => false, 
-                            'message' => 'Notificación no encontrada'
-                        ]);
+                        echo json_encode(['success' => false, 'message' => 'No encontrada']);
                     }
                 } catch (Exception $e) {
                     error_log("Error al eliminar notificación: " . $e->getMessage());
                     http_response_code(500);
-                    echo json_encode([
-                        'success' => false, 
-                        'message' => 'Error interno del servidor'
-                    ]);
+                    echo json_encode(['success' => false, 'message' => 'Error interno']);
                 }
                 break;
 
             default:
                 http_response_code(400);
-                echo json_encode([
-                    'success' => false, 
-                    'message' => 'Acción no válida: ' . $input['action']
-                ]);
+                echo json_encode(['success' => false, 'message' => 'Acción no válida']);
         }
         break;
 
     default:
         http_response_code(405);
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Método no permitido'
-        ]);
+        echo json_encode(['success' => false, 'message' => 'Método no permitido']);
 }
+
+// Limpiar buffer de salida
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;
