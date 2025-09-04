@@ -5,6 +5,12 @@
  * Crea una notificación para el administrador.
  */
 
+// Asegurar salida limpia
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 require_once '../bootstrap.php';
 require_auth(); // Solo usuarios autenticados
 
@@ -14,14 +20,16 @@ header('Content-Type: application/json');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Método no permitido.']);
+    ob_end_flush();
     exit;
 }
 
-// Validar CSRF
+// Validar CSRF desde header
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Error de seguridad (CSRF).']);
+    ob_end_flush();
     exit;
 }
 
@@ -34,6 +42,7 @@ $username = $_SESSION['username'];
 if (!$site_id) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'ID de sitio no válido.']);
+    ob_end_flush();
     exit;
 }
 
@@ -46,6 +55,7 @@ try {
     if (!$stmt->fetch()) {
         http_response_code(403);
         echo json_encode(['success' => false, 'message' => 'No tienes acceso a este sitio.']);
+        ob_end_flush();
         exit;
     }
 
@@ -55,8 +65,8 @@ try {
     $site = $stmt->fetch();
     $site_name = $site ? $site['name'] : 'Sitio desconocido';
 
-    // Mensaje de notificación
-    $message = "🚨 El usuario '$username' reportó un problema con el sitio '$site_name'.";
+    // ✅ Mensaje claro con usuario y sitio
+    $message = "🚨 El usuario '{$username}' reportó un problema con el sitio '{$site_name}'.";
 
     // Insertar notificación
     $stmt = $pdo->prepare("
@@ -75,3 +85,8 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error al reportar el problema.']);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;

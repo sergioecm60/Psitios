@@ -13,11 +13,6 @@ header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-// Para entornos con CORS (opcional)
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-CSRF-TOKEN');
-
 // Iniciar sesión si no está activa
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -30,7 +25,7 @@ if (!isset($_SESSION['user_id'])) {
         'success' => false,
         'message' => 'Usuario no autenticado'
     ]);
-    ob_end_flush(); // Asegurar salida limpia
+    ob_end_flush();
     exit;
 }
 
@@ -51,57 +46,86 @@ try {
 }
 
 // Validar token CSRF (solo para POST)
-function validateCsrfToken() {
-    $headerToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
-    $sessionToken = $_SESSION['csrf_token'] ?? null;
-
-    if (!$headerToken || !$sessionToken || !hash_equals($sessionToken, $headerToken)) {
-        http_response_code(403);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Token CSRF inválido'
-        ]);
-        ob_end_flush();
-        exit;
-    }
+$csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($csrf_token)) {
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Token CSRF inválido'
+    ]);
+    ob_end_flush();
+    exit;
 }
+
+$input = json_decode(file_get_contents('php://input'), true);
 
 // Manejar métodos HTTP
 switch ($_SERVER['REQUEST_METHOD']) {
     case 'OPTIONS':
-        // Preflight CORS
         http_response_code(200);
+        ob_end_flush();
         exit;
 
     case 'GET':
         try {
-            $stmt = $pdo->prepare("
-                SELECT 
-                    n.id,
-                    n.user_id,
-                    n.site_id,
-                    n.message,
-                    n.is_read,
-                    n.created_at,
-                    n.resolved_at,
-                    s.name AS site_name
-                FROM notifications n
-                LEFT JOIN sites s ON n.site_id = s.id
-                WHERE n.user_id = ?
-                ORDER BY n.created_at DESC
-                LIMIT 50
-            ");
-            $stmt->execute([$_SESSION['user_id']]);
+            $user_id = $_SESSION['user_id'];
+            $user_role = $_SESSION['user_role'] ?? 'user';
+
+            // ✅ Si es admin, ve todas las notificaciones
+            // ✅ Si es user, solo las suyas
+            if ($user_role === 'admin') {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        n.id,
+                        n.user_id,
+                        n.site_id,
+                        n.message,
+                        n.is_read,
+                        n.created_at,
+                        n.resolved_at,
+                        u.username as sender_username,
+                        s.name AS site_name
+                    FROM notifications n
+                    LEFT JOIN users u ON n.user_id = u.id
+                    LEFT JOIN sites s ON n.site_id = s.id
+                    ORDER BY n.created_at DESC
+                    LIMIT 50
+                ");
+                $stmt->execute();
+            } else {
+                // Usuario normal: solo sus notificaciones
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        n.id,
+                        n.user_id,
+                        n.site_id,
+                        n.message,
+                        n.is_read,
+                        n.created_at,
+                        n.resolved_at,
+                        s.name AS site_name
+                    FROM notifications n
+                    LEFT JOIN sites s ON n.site_id = s.id
+                    WHERE n.user_id = ?
+                    ORDER BY n.created_at DESC
+                    LIMIT 50
+                ");
+                $stmt->execute([$user_id]);
+            }
+
             $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($notifications as &$n) {
                 $n['is_read'] = (bool) $n['is_read'];
-                $n['created_at'] = date('c', strtotime($n['created_at'])); // ISO 8601
+                $n['created_at'] = date('c', strtotime($n['created_at']));
                 if ($n['resolved_at']) {
                     $n['resolved_at'] = date('c', strtotime($n['resolved_at']));
                 }
+                // ✅ Mostrar quién generó la alerta si es admin
                 $n['title'] = $n['site_name'] 
-                    ? 'Notificación: ' . $n['site_name'] 
+                    ? ($n['sender_username'] 
+                        ? "Notificación: {$n['site_name']} ({$n['sender_username']})" 
+                        : "Notificación: {$n['site_name']}")
                     : 'Notificación del sistema';
             }
 
@@ -122,9 +146,6 @@ switch ($_SERVER['REQUEST_METHOD']) {
         break;
 
     case 'POST':
-        validateCsrfToken();
-
-        $input = json_decode(file_get_contents('php://input'), true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'JSON inválido']);
@@ -146,8 +167,8 @@ switch ($_SERVER['REQUEST_METHOD']) {
                     break;
                 }
                 try {
-                    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?");
-                    $stmt->execute([$id, $_SESSION['user_id']]);
+                    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ?");
+                    $stmt->execute([(int)$id]);
                     echo json_encode(['success' => true, 'message' => 'Marcada como leída']);
                 } catch (Exception $e) {
                     error_log("Error al marcar como leída: " . $e->getMessage());
@@ -158,8 +179,8 @@ switch ($_SERVER['REQUEST_METHOD']) {
 
             case 'mark_all_read':
                 try {
-                    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0");
-                    $stmt->execute([$_SESSION['user_id']]);
+                    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE is_read = 0");
+                    $stmt->execute();
                     $count = $stmt->rowCount();
                     echo json_encode([
                         'success' => true,
@@ -180,8 +201,8 @@ switch ($_SERVER['REQUEST_METHOD']) {
                     break;
                 }
                 try {
-                    $stmt = $pdo->prepare("DELETE FROM notifications WHERE id = ? AND user_id = ?");
-                    $stmt->execute([$id, $_SESSION['user_id']]);
+                    $stmt = $pdo->prepare("DELETE FROM notifications WHERE id = ?");
+                    $stmt->execute([(int)$id]);
                     if ($stmt->rowCount() > 0) {
                         echo json_encode(['success' => true, 'message' => 'Notificación eliminada']);
                     } else {

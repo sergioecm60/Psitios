@@ -1,190 +1,175 @@
 <?php
+// api/manage_users.php
+
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 require_once __DIR__ . '/../bootstrap.php';
 require_auth('admin');
-
 header('Content-Type: application/json');
 
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo = get_pdo_connection();
 
+// Validar CSRF
+$csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+if ($method === 'POST' && !verify_csrf_token($csrf_token)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido']);
+    ob_end_flush();
+    exit;
+}
+
 try {
     switch ($method) {
         case 'GET':
-            if (!isset($_GET['action'])) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Acción no especificada']);
-                exit;
-            }
+            $action = $_GET['action'] ?? null;
+            $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
-            switch ($_GET['action']) {
-                case 'list':
-                    $stmt = $pdo->query("
-                        SELECT 
-                            u.id,
-                            u.username,
-                            u.role,
-                            u.is_active,
-                            u.created_at,
-                            u.company_id,
-                            u.branch_id,
-                            c.name as company_name,
-                            b.name as branch_name,
-                            b.province,
-                            u.assigned_admin_id
-                        FROM users u
-                        LEFT JOIN companies c ON u.company_id = c.id
-                        LEFT JOIN branches b ON u.branch_id = b.id
-                        ORDER BY u.username ASC
-                    ");
-                    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                    echo json_encode(['success' => true, 'data' => $users]);
-                    break;
+            if ($action === 'list') {
+                $stmt = $pdo->query("
+                    SELECT 
+                        u.id, u.username, u.role, u.is_active, u.created_at,
+                        c.name as company_name,
+                        b.name as branch_name,
+                        b.province
+                    FROM users u
+                    LEFT JOIN companies c ON u.company_id = c.id
+                    LEFT JOIN branches b ON u.branch_id = b.id
+                    ORDER BY u.username ASC
+                ");
+                $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                case 'get':
-                    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-                    if (!$id) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'message' => 'ID inválido']);
-                        exit;
-                    }
-                    $stmt = $pdo->prepare("
-                        SELECT 
-                            u.id,
-                            u.username,
-                            u.role,
-                            u.is_active,
-                            u.company_id,
-                            u.branch_id,
-                            u.assigned_admin_id
-                        FROM users u
-                        WHERE u.id = ?
-                    ");
-                    $stmt->execute([$id]);
-                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
-                    if (!$user) {
-                        http_response_code(404);
-                        echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
-                        exit;
-                    }
-                    echo json_encode(['success' => true, 'data' => $user]);
-                    break;
+                foreach ($users as &$user) {
+                    $user['id'] = (int)$user['id'];
+                    $user['is_active'] = (bool)$user['is_active'];
+                }
 
-                case 'get_assigned_sites':
-                    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-                    if (!$id) {
-                        http_response_code(400);
-                        echo json_encode(['success' => false, 'message' => 'ID de usuario no proporcionado']);
-                        exit;
-                    }
-
-                    try {
-                        $stmt = $pdo->prepare("
-                            SELECT 
-                                s.id, 
-                                st.name, 
-                                st.url, 
-                                s.username, 
-                                COALESCE(s.password_needs_update, 0) as password_needs_update
-                            FROM services s
-                            JOIN sites st ON s.site_id = st.id
-                            WHERE s.user_id = ?
-                        ");
-                        $stmt->execute([$id]);
-                        $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-                        echo json_encode(['success' => true, 'data' => $sites]);
-                    } catch (PDOException $e) {
-                        error_log("Error en get_assigned_sites: " . $e->getMessage());
-                        echo json_encode(['success' => true, 'data' => []]);
-                    }
-                    break;
-
-                default:
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'message' => 'Acción no válida']);
-                    break;
+                echo json_encode(['success' => true, 'data' => $users]);
+            } elseif ($action === 'get' && $id) {
+                $stmt = $pdo->prepare("
+                    SELECT 
+                        id, username, role, is_active, company_id, branch_id
+                    FROM users 
+                    WHERE id = ?
+                ");
+                $stmt->execute([$id]);
+                $user = $stmt->fetch(PDO::FETCH_ASSOC);
+                if (!$user) {
+                    http_response_code(404);
+                    echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
+                    ob_end_flush();
+                    exit;
+                }
+                $user['is_active'] = (bool)$user['is_active'];
+                $user['id'] = (int)$user['id'];
+                $user['company_id'] = $user['company_id'] ? (int)$user['company_id'] : null;
+                $user['branch_id'] = $user['branch_id'] ? (int)$user['branch_id'] : null;
+                echo json_encode(['success' => true, 'data' => $user]);
+            } elseif ($action === 'get_assigned_sites' && $id) {
+                $stmt = $pdo->prepare("
+                    SELECT s.id, s.name 
+                    FROM services svc
+                    JOIN sites s ON svc.site_id = s.id
+                    WHERE svc.user_id = ?
+                ");
+                $stmt->execute([$id]);
+                $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                echo json_encode(['success' => true, 'data' => $sites]);
             }
             break;
 
         case 'POST':
-            validate_csrf_token();
             $input = json_decode(file_get_contents('php://input'), true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'JSON inválido']);
+                ob_end_flush();
+                exit;
+            }
+
+            $action = $input['action'] ?? null;
             $id = $input['id'] ?? null;
             $username = trim($input['username'] ?? '');
+            $password = $input['password'] ?? null;
             $role = $input['role'] ?? 'user';
-            $is_active = $input['is_active'] ?? 1;
+            $is_active = !empty($input['is_active']) ? 1 : 0;
             $company_id = $input['company_id'] ?? null;
             $branch_id = $input['branch_id'] ?? null;
-            $password = $input['password'] ?? null;
             $assigned_sites = $input['assigned_sites'] ?? [];
 
             if (empty($username)) {
                 http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Nombre de usuario requerido']);
+                echo json_encode(['success' => false, 'message' => 'Usuario es requerido']);
+                ob_end_flush();
                 exit;
-            }
-
-            if ($password) {
-                $password_hash = password_hash($password, PASSWORD_DEFAULT);
-            } else {
-                $password_hash = null;
             }
 
             if ($id) {
-                $stmt = $pdo->prepare("
-                    UPDATE users 
-                    SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?
-                    " . ($password_hash ? ", password_hash = ?" : "") . "
-                    WHERE id = ?
-                ");
-                $params = [$username, $role, $is_active, $company_id, $branch_id];
-                if ($password_hash) $params[] = $password_hash;
+                // Editar
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
+                $stmt->execute([$username, $id]);
+                if ($stmt->fetch()) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Usuario ya existe']);
+                    ob_end_flush();
+                    exit;
+                }
+
+                $sql = "UPDATE users SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?";
+                $params = [$username, $role, $is_active, $company_id ?: null, $branch_id ?: null];
+
+                if (!empty($password)) {
+                    $password_hash = password_hash($password, PASSWORD_DEFAULT);
+                    $sql .= ", password_hash = ?";
+                    $params[] = $password_hash;
+                }
+
+                $sql .= " WHERE id = ?";
                 $params[] = $id;
+
+                $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
+
+                // Actualizar sitios asignados
+                $stmt = $pdo->prepare("DELETE FROM services WHERE user_id = ?");
+                $stmt->execute([$id]);
+
+                foreach ($assigned_sites as $site_id) {
+                    $stmt = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
+                    $stmt->execute([$id, $site_id]);
+                }
+
                 echo json_encode(['success' => true, 'message' => 'Usuario actualizado']);
             } else {
+                // Crear
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+                $stmt->execute([$username]);
+                if ($stmt->fetch()) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'message' => 'Usuario ya existe']);
+                    ob_end_flush();
+                    exit;
+                }
+
+                $password_hash = $password ? password_hash($password, PASSWORD_DEFAULT) : password_hash('temp123', PASSWORD_DEFAULT);
+
                 $stmt = $pdo->prepare("
-                    INSERT INTO users (username, role, is_active, company_id, branch_id, password_hash, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$username, $role, $is_active, $company_id, $branch_id, $password_hash, $_SESSION['user_id']]);
+                $stmt->execute([$username, $password_hash, $role, $is_active, $company_id ?: null, $branch_id ?: null]);
                 $newId = $pdo->lastInsertId();
 
-                $stmt = $pdo->prepare("UPDATE users SET assigned_admin_id = ? WHERE id = ?");
-                $stmt->execute([$_SESSION['user_id'], $newId]);
-
-                echo json_encode(['success' => true, 'message' => 'Usuario creado', 'id' => $newId]);
-            }
-
-            if (!empty($assigned_sites)) {
-                $stmt = $pdo->prepare("DELETE FROM services WHERE user_id = ?");
-                $stmt->execute([$id ?: $newId]);
-
-                $insertStmt = $pdo->prepare("
-                    INSERT INTO services (user_id, site_id, username, password_hash, password_needs_update)
-                    SELECT ?, site_id, '', '', 0 FROM sites WHERE id = ?
-                ");
+                // Asignar sitios
                 foreach ($assigned_sites as $site_id) {
-                    $insertStmt->execute([$id ?: $newId, $site_id]);
+                    $stmt = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
+                    $stmt->execute([$newId, $site_id]);
                 }
-            }
-            break;
 
-        case 'DELETE':
-            validate_csrf_token();
-            $input = json_decode(file_get_contents('php://input'), true);
-            $id = $input['id'] ?? null;
-            if (!$id) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'ID no proporcionado']);
-                exit;
-            }
-            $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->execute([$id]);
-            if ($stmt->rowCount() > 0) {
-                echo json_encode(['success' => true, 'message' => 'Usuario eliminado']);
-            } else {
-                http_response_code(404);
-                echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
+                echo json_encode(['success' => true, 'message' => 'Usuario creado', 'id' => (int)$newId]);
             }
             break;
 
@@ -195,12 +180,10 @@ try {
 } catch (Exception $e) {
     error_log("Error en manage_users.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error interno del servidor']);
+    echo json_encode(['success' => false, 'message' => 'Error interno']);
 }
 
-function validate_csrf_token() {
-    $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-    if (!verify_csrf_token($csrf_token)) {
-        throw new Exception('Token CSRF inválido');
-    }
+if (ob_get_level()) {
+    ob_end_flush();
 }
+exit;

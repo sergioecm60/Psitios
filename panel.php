@@ -1,6 +1,6 @@
 <?php
 /**
- * panel.php - Sin estilos en línea, sin errores CSP
+ * panel.php - Panel de usuario seguro con CSP, sin errores
  */
 require_once 'bootstrap.php';
 require_auth();
@@ -10,19 +10,12 @@ $username = $_SESSION['username'] ?? 'Usuario';
 $pdo = get_pdo_connection();
 $nonce = base64_encode(random_bytes(16));
 $csrf_token = generate_csrf_token();
+$admin_id = 1; // Cambia si tu admin tiene otro ID
 
+// Content Security Policy (CSP) segura
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'nonce-{$nonce}'; connect-src 'self';");
-
-$stmt = $pdo->prepare("
-    SELECT s.id, st.id as site_id, st.name, st.url, s.password_needs_update
-    FROM services s
-    JOIN sites st ON s.site_id = st.id
-    WHERE s.user_id = :user_id
-    ORDER BY st.name ASC
-");
-$stmt->execute(['user_id' => $user_id]);
-$services = $stmt->fetchAll();
 ?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -32,7 +25,7 @@ $services = $stmt->fetchAll();
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/css/main.css">
 
-    <!-- Estilos con nonce -->
+    <!-- Estilos con nonce (seguro para CSP) -->
     <style nonce="<?= htmlspecialchars($nonce) ?>">
         /* Chat */
         #chat-modal {
@@ -83,6 +76,7 @@ $services = $stmt->fetchAll();
             border-radius: 4px;
         }
         .chat-message {
+            position: relative; /* ← Aquí va el estilo, no en el HTML */
             margin: 8px 0;
             padding: 6px 10px;
             border-radius: 12px;
@@ -128,7 +122,10 @@ $services = $stmt->fetchAll();
     </style>
 </head>
 <body>
+    <!-- Datos ocultos para JS -->
     <input type="hidden" id="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
+    <input type="hidden" id="admin_id" value="<?= (int)$admin_id ?>">
+    <input type="hidden" id="user_id" value="<?= (int)$user_id ?>">
 
     <div class="container">
         <header class="admin-header">
@@ -140,6 +137,18 @@ $services = $stmt->fetchAll();
         </header>
 
         <div class="services-grid">
+            <?php
+            $stmt = $pdo->prepare("
+                SELECT s.id, st.id as site_id, st.name, st.url, s.password_needs_update
+                FROM services s
+                JOIN sites st ON s.site_id = st.id
+                WHERE s.user_id = :user_id
+                ORDER BY st.name ASC
+            ");
+            $stmt->execute(['user_id' => $user_id]);
+            $services = $stmt->fetchAll();
+            ?>
+
             <?php if (empty($services)): ?>
                 <p>No tienes sitios asignados.</p>
             <?php else: ?>
@@ -151,11 +160,11 @@ $services = $stmt->fetchAll();
                         <?php endif; ?>
                         <a href="<?= htmlspecialchars($service['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn-launch">🌐 Acceder</a>
                         <div class="credentials-area">
-                            <button class="btn-view-creds" data-id="<?= $service['id'] ?>">👁️ Ver</button>
-                            <button class="btn-notify-expired" data-id="<?= $service['id'] ?>" <?= $service['password_needs_update'] ? 'disabled' : '' ?>>⏳ Notificar</button>
-                            <button class="btn-report-problem" data-site-id="<?= htmlspecialchars($service['site_id']) ?>">🚨 Reportar</button>
+                            <button class="btn-view-creds" data-id="<?= (int)$service['id'] ?>">👁️ Ver</button>
+                            <button class="btn-notify-expired" data-id="<?= (int)$service['id'] ?>" <?= $service['password_needs_update'] ? 'disabled' : '' ?>>⏳ Notificar</button>
+                            <button class="btn-report-problem" data-site-id="<?= (int)$service['site_id'] ?>">🚨 Reportar</button>
                         </div>
-                        <div class="creds-display hidden" id="creds-<?= $service['id'] ?>">
+                        <div class="creds-display hidden" id="creds-<?= (int)$service['id'] ?>">
                             <p>Cargando...</p>
                         </div>
                     </div>
@@ -183,6 +192,8 @@ $services = $stmt->fetchAll();
 
     <script nonce="<?= htmlspecialchars($nonce) ?>">
         const csrfToken = document.getElementById('csrf_token').value;
+        const adminId = document.getElementById('admin_id').value;
+        const userId = document.getElementById('user_id').value;
         const chatModal = document.getElementById('chat-modal');
         const chatToggleBtn = document.getElementById('chat-toggle-btn');
         const chatMessages = document.getElementById('chat-messages');
@@ -194,7 +205,11 @@ $services = $stmt->fetchAll();
         document.querySelectorAll('.close-button').forEach(btn => {
             btn.addEventListener('click', () => chatModal.classList.remove('active'));
         });
-        window.addEventListener('click', e => e.target === chatModal && chatModal.classList.remove('active'));
+        window.addEventListener('click', e => {
+            if (e.target === chatModal) {
+                chatModal.classList.remove('active');
+            }
+        });
 
         // Enviar mensaje
         chatForm.addEventListener('submit', async (e) => {
@@ -209,8 +224,16 @@ $services = $stmt->fetchAll();
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': csrfToken
                     },
-                    body: JSON.stringify({ message: text })
+                    body: JSON.stringify({
+                        message: text,
+                        receiver_id: adminId
+                    })
                 });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
 
                 const result = await response.json();
                 if (result.success) {
@@ -220,7 +243,7 @@ $services = $stmt->fetchAll();
                     alert('Error: ' + result.message);
                 }
             } catch (error) {
-                alert('Error de conexión');
+                alert('Error de conexión: ' + error.message);
             }
         });
 
@@ -228,18 +251,18 @@ $services = $stmt->fetchAll();
         async function fetchChatMessages() {
             try {
                 const response = await fetch('api/get_messages.php');
-                const text = await response.text();
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${text}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
                 }
 
-                const data = JSON.parse(text);
+                const data = await response.json();
                 if (data.success) {
                     chatMessages.innerHTML = data.messages.map(msg => {
-                        const isSent = msg.sender_id == <?= $user_id ?>;
+                        const isSent = msg.sender_id == userId;
                         return `
-                            <div class="chat-message ${isSent ? 'sent' : 'received'}" style="position: relative;">
+                            <div class="chat-message ${isSent ? 'sent' : 'received'}">
                                 <strong>${isSent ? 'Tú' : 'Admin'}:</strong> ${escapeHTML(msg.message)}
                                 <br><small>${formatTime(msg.created_at)}</small>
                                 ${isSent ? `<button class="delete-msg-btn" data-id="${msg.id}" title="Eliminar">×</button>` : ''}
@@ -253,7 +276,7 @@ $services = $stmt->fetchAll();
             }
         }
 
-        // Polling
+        // Polling cada 10 segundos
         setInterval(fetchChatMessages, 10000);
         chatToggleBtn.addEventListener('click', () => setTimeout(fetchChatMessages, 500));
 
@@ -269,7 +292,11 @@ $services = $stmt->fetchAll();
                         body: JSON.stringify({ message_id: id })
                     });
                     const result = await response.json();
-                    result.success && fetchChatMessages();
+                    if (result.success) {
+                        fetchChatMessages();
+                    } else {
+                        alert('No se pudo eliminar: ' + result.message);
+                    }
                 } catch (error) {
                     alert('Error de conexión.');
                 }
@@ -297,10 +324,12 @@ $services = $stmt->fetchAll();
                         body: JSON.stringify({ id: serviceId })
                     });
 
-                    const text = await response.text();
-                    if (!response.ok) throw new Error(`Error ${response.status}`);
+                    if (!response.ok) {
+                        const errorText = await response.text();
+                        throw new Error(`Error ${response.status}: ${errorText}`);
+                    }
 
-                    const result = JSON.parse(text);
+                    const result = await response.json();
                     if (result.success) {
                         credsDiv.innerHTML = `
                             <p><strong>👤 Usuario:</strong> 
@@ -377,7 +406,7 @@ $services = $stmt->fetchAll();
             });
         });
 
-        // --- COPIAR ---
+        // --- COPIAR AL PORTAPAPELES ---
         document.addEventListener('click', e => {
             if (e.target.classList.contains('btn-copy')) {
                 const text = e.target.dataset.copy;
@@ -385,10 +414,13 @@ $services = $stmt->fetchAll();
                     const original = e.target.textContent;
                     e.target.textContent = '✅';
                     setTimeout(() => e.target.textContent = original, 1500);
+                }).catch(err => {
+                    console.error('Error al copiar:', err);
                 });
             }
         });
 
+        // --- FUNCIONES AUXILIARES ---
         function escapeHTML(str) {
             const div = document.createElement('div');
             div.textContent = str;

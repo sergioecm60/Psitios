@@ -73,7 +73,7 @@ class NotificationManager {
         this.isLoading = true;
 
         try {
-            const response = await fetch('/Psitios/api/notifications_api.php', {
+            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
                 method: 'GET',
                 headers: {
                     'Accept': 'application/json',
@@ -187,10 +187,6 @@ class NotificationManager {
                 notification_id: notificationId
             };
 
-            if (this.csrfToken) {
-                requestBody.csrf_token = this.csrfToken;
-            }
-
             const headers = {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -200,7 +196,7 @@ class NotificationManager {
                 headers['X-CSRF-TOKEN'] = this.csrfToken;
             }
 
-            const response = await fetch('/Psitios/api/notifications_api.php', {
+            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
                 method: 'POST',
                 headers: headers,
                 credentials: 'same-origin',
@@ -227,10 +223,6 @@ class NotificationManager {
                 notification_id: notificationId
             };
 
-            if (this.csrfToken) {
-                requestBody.csrf_token = this.csrfToken;
-            }
-
             const headers = {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -240,7 +232,7 @@ class NotificationManager {
                 headers['X-CSRF-TOKEN'] = this.csrfToken;
             }
 
-            const response = await fetch('/Psitios/api/notifications_api.php', {
+            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
                 method: 'POST',
                 headers: headers,
                 credentials: 'same-origin',
@@ -266,10 +258,6 @@ class NotificationManager {
                 action: 'mark_all_read'
             };
 
-            if (this.csrfToken) {
-                requestBody.csrf_token = this.csrfToken;
-            }
-
             const headers = {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -279,7 +267,7 @@ class NotificationManager {
                 headers['X-CSRF-TOKEN'] = this.csrfToken;
             }
 
-            const response = await fetch('/Psitios/api/notifications_api.php', {
+            const response = await fetch('api/notifications_api.php', { // ✅ Ruta relativa
                 method: 'POST',
                 headers: headers,
                 credentials: 'same-origin',
