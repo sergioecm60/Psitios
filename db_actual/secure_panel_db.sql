@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost:3306
--- Generation Time: Sep 04, 2025 at 07:30 PM
+-- Generation Time: Sep 05, 2025 at 02:58 PM
 -- Server version: 8.4.3
 -- PHP Version: 8.3.16
 
@@ -465,7 +465,6 @@ INSERT INTO `provinces` (`id`, `name`, `country_id`, `created_at`) VALUES
 (168, 'Cauca', 7, '2025-09-04 18:36:08'),
 (169, 'Cesar', 7, '2025-09-04 18:36:08'),
 (170, 'Chocó', 7, '2025-09-04 18:36:08'),
-(171, 'Córdoba', 7, '2025-09-04 18:36:08'),
 (172, 'Cundinamarca', 7, '2025-09-04 18:36:08'),
 (173, 'Guainía', 7, '2025-09-04 18:36:08'),
 (174, 'Guaviare', 7, '2025-09-04 18:36:08'),
@@ -717,7 +716,7 @@ ALTER TABLE `companies`
 -- AUTO_INCREMENT for table `countries`
 --
 ALTER TABLE `countries`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=236;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=171;
 
 --
 -- AUTO_INCREMENT for table `messages`
@@ -735,7 +734,7 @@ ALTER TABLE `notifications`
 -- AUTO_INCREMENT for table `provinces`
 --
 ALTER TABLE `provinces`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=225;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=216;
 
 --
 -- AUTO_INCREMENT for table `services`

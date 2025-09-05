@@ -1,16 +1,13 @@
 {
-    "name": "vlucas/phpdotenv",
-    "description": "composer",
-    "autoload": {
-        "psr-4": {
-            "Vlucas\\Phpdotenv\\": "src/"
-        }
-    },
+    "name": "sergioecm60/psitios",
+    "description": "Panel de Gestión Segura y Jerárquica",
     "authors": [
         {
-            "name": "sergioecm60",
+            "name": "Sergio Cabrera Miers",
             "email": "sergiomiers@gmail.com"
         }
     ],
-    "require": {}
+    "require": {
+        "vlucas/phpdotenv": "^5.6"
+    }
 }

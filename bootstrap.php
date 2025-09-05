@@ -15,6 +15,23 @@ ini_set('display_startup_errors', '1');
 // Cargar dependencias de Composer
 require_once __DIR__ . '/vendor/autoload.php';
 
+// Verificar si las dependencias de Composer están cargadas.
+if (!class_exists(Dotenv\Dotenv::class)) {
+    header('Content-Type: text/plain; charset=utf-8', true, 500);
+    die("Error Crítico: Las dependencias de Composer no están instaladas correctamente.\n\n" .
+        "Por favor, ejecute 'composer update' en la terminal desde el directorio del proyecto (C:\\laragon\\www\\Psitios).\n\n" .
+        "La clase 'Dotenv\\Dotenv' no fue encontrada.");
+}
+
+// Verificar si el archivo .env existe para evitar errores fatales.
+if (!file_exists(__DIR__ . '/.env')) {
+    header('Content-Type: text/plain; charset=utf-8', true, 500);
+    die("Error de Configuración: El archivo .env no existe.\n\n" .
+        "Por favor, copie el archivo '.env.example' a '.env' y complete sus credenciales de base de datos y la ENCRYPTION_KEY.\n\n" .
+        "Este archivo es esencial para que la aplicación funcione localmente y está ignorado por Git por seguridad."
+    );
+}
+
 // Cargar variables de entorno desde .env
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
@@ -48,14 +65,13 @@ function get_pdo_connection() {
             error_log("Error de conexión a la base de datos: " . $e->getMessage());
             if (php_sapi_name() === 'cli') {
                 echo "Error de conexión a la base de datos\n";
+            } elseif (is_api_request()) {
+                http_response_code(500);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Error de conexión a la base de datos. Verifique las credenciales en el archivo .env y que el servidor de base de datos esté en ejecución.']);
             } else {
                 http_response_code(500);
-                if (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false) {
-                    header('Content-Type: application/json');
-                    echo json_encode(['success' => false, 'message' => 'Error de conexión a la base de datos']);
-                } else {
-                    echo "Error de conexión a la base de datos";
-                }
+                echo "Error de conexión a la base de datos. Verifique la configuración.";
             }
             exit(1);
         }

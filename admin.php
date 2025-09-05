@@ -6,6 +6,9 @@ if (empty($_SESSION['csrf_token'])) {
 }
 $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 $user_role = $_SESSION['user_role'] ?? 'user';
+ini_set('display_errors', '1');
+ini_set('display_startup_errors', '1');
+error_reporting(E_ALL);
 ?>
 <!DOCTYPE html>
 <html lang="es">
