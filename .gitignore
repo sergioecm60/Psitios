@@ -1,19 +1,22 @@
-# Composer - Dependencias de PHP
+# Dependencias de Composer
 /vendor/
+composer.lock
 
-# Archivos de entorno - ¡Contienen secretos!
+# Archivo de variables de entorno local. ¡Nunca subir a Git!
 .env
-.env.local
-.env.*.local
 
-# Archivos de registro y logs
+# Archivos de entorno para otros ambientes
+.env.*
+!.env.example
+
+# Logs y archivos temporales
 *.log
 logs/
 
-# Archivos de configuración del editor de código
-.vscode/
+# Archivos de configuración de IDEs y sistema operativo
 .idea/
-
-# Archivos del sistema operativo
+.vscode/
+*.swp
+*~
 .DS_Store
 Thumbs.db

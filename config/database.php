@@ -5,11 +5,11 @@
  */
 
 // Configuraciones de base de datos
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'secure_panel_db');
-define('DB_USER', 'secmpanel');
-define('DB_PASS', 'Psitios2025');
-define('DB_CHARSET', 'utf8mb4');
+define('DB_HOST', $_ENV['DB_HOST'] ?? 'localhost');
+define('DB_NAME', $_ENV['DB_NAME'] ?? 'secure_panel_db');
+define('DB_USER', $_ENV['DB_USER'] ?? 'root');
+define('DB_PASS', $_ENV['DB_PASS'] ?? '');
+define('DB_CHARSET', $_ENV['DB_CHARSET'] ?? 'utf8mb4');
 
 // Configuración adicional para MySQL 8.4.3 Percona
 define('DB_OPTIONS', [

@@ -25,7 +25,7 @@ if (!verify_csrf_token($csrf_token)) {
     exit();
 }
 
-$pdo = get_database_connection($config);
+$pdo = get_pdo_connection();
 $stmt = $pdo->prepare("SELECT id, username, password_hash, role, is_active FROM users WHERE username = ?");
 $stmt->execute([$user]);
 $user_data = $stmt->fetch();

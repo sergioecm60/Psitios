@@ -57,10 +57,10 @@ try {
         exit;
     }
     
-    // ✅ CORRECCIÓN: Usar decrypt_data() en lugar de decrypt_password()
+    // Desencriptar la contraseña usando las partes almacenadas en la BD
     $decrypted_password = '';
     if (!empty($site_credentials['password_encrypted']) && !empty($site_credentials['iv'])) {
-        $decrypted_password = decrypt_data(base64_encode($site_credentials['iv'] . $site_credentials['password_encrypted']));
+        $decrypted_password = decrypt_from_parts($site_credentials['password_encrypted'], $site_credentials['iv']);
     }
 
     echo json_encode([

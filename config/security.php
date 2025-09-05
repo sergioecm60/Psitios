@@ -5,9 +5,28 @@
  * Contiene funciones de seguridad críticas para la aplicación.
  */
 
-// Clave maestra para encriptar datos sensibles (como contraseñas de sitios)
-define('ENCRYPTION_KEY', 'k3n9z1x8c5v6b7n4m2l1j2h3g4f5d6s7'); // ¡NUNCA la cambies!
 define('ENCRYPTION_CIPHER', 'aes-256-cbc');
+
+/**
+ * Obtiene la clave de cifrado desde las variables de entorno.
+ *
+ * @return string La clave de cifrado (debe ser de 32 bytes).
+ * @throws Exception Si la clave no está configurada o no es válida.
+ */
+function get_encryption_key(): string
+{
+    static $key = null;
+    if ($key === null) {
+        $key = $_ENV['ENCRYPTION_KEY'] ?? '';
+        if (mb_strlen($key, '8bit') !== 32) {
+            // En un entorno real, esto debería solo loguear el error y no exponer detalles.
+            error_log('CRITICAL: ENCRYPTION_KEY no está definida en .env o no tiene 32 bytes.');
+            throw new Exception('La clave de cifrado no está configurada correctamente. Contacte al administrador.');
+        }
+    }
+    return $key;
+}
+
 
 /**
  * Genera un hash seguro de una contraseña (para usuarios del panel).
@@ -34,49 +53,48 @@ function verify_password(string $password, string $hash): bool
 }
 
 /**
- * Encripta un valor usando AES-256-CBC.
+ * Cifra un texto plano y devuelve el ciphertext y el IV como un array.
+ * Diseñado para almacenar en columnas de base de datos separadas.
  *
- * @param string $value Valor a encriptar.
- * @return string|false Valor encriptado en base64, o false si falla.
+ * @param string $plaintext El texto a cifrar.
+ * @return array|null Un array con ['ciphertext' => ..., 'iv' => ...], o null en caso de error.
  */
-function encrypt_data(string $value): ?string
+function encrypt_to_parts(string $plaintext): ?array
 {
-    $cipher = ENCRYPTION_CIPHER;
-    $key = hash('sha256', ENCRYPTION_KEY, true);
-    $iv = openssl_random_pseudo_bytes(openssl_cipher_iv_length($cipher));
-    
-    $encrypted = openssl_encrypt($value, $cipher, $key, 0, $iv);
-    if ($encrypted === false) {
+    try {
+        $key = get_encryption_key();
+        $iv_length = openssl_cipher_iv_length(ENCRYPTION_CIPHER);
+        $iv = random_bytes($iv_length);
+        $ciphertext = openssl_encrypt($plaintext, ENCRYPTION_CIPHER, $key, OPENSSL_RAW_DATA, $iv);
+
+        if ($ciphertext === false) {
+            return null;
+        }
+
+        return ['ciphertext' => $ciphertext, 'iv' => $iv];
+    } catch (Exception $e) {
+        error_log("Error de encriptación: " . $e->getMessage());
         return null;
     }
-    
-    return base64_encode($iv . $encrypted);
 }
 
 /**
- * Desencripta un valor encriptado con encrypt_data.
+ * Descifra datos almacenados como partes separadas (ciphertext e IV).
  *
- * @param string $value Valor encriptado en base64.
- * @return string|false Valor desencriptado o false si falla.
+ * @param string $ciphertext El texto cifrado (raw binary).
+ * @param string $iv El vector de inicialización (raw binary).
+ * @return string|null El texto plano descifrado, o null en caso de error.
  */
-function decrypt_data(string $value): ?string
+function decrypt_from_parts(string $ciphertext, string $iv): ?string
 {
-    $cipher = ENCRYPTION_CIPHER;
-    $key = hash('sha256', ENCRYPTION_KEY, true);
-    
-    $data = base64_decode($value);
-    if ($data === false) return null;
-    
-    $iv_length = openssl_cipher_iv_length($cipher);
-    if (strlen($data) < $iv_length) return null;
-    
-    $iv = substr($data, 0, $iv_length);
-    $encrypted = substr($data, $iv_length);
-    
-    $decrypted = openssl_decrypt($encrypted, $cipher, $key, 0, $iv);
-    if ($decrypted === false) return null;
-    
-    return $decrypted;
+    try {
+        $key = get_encryption_key();
+        $decrypted = openssl_decrypt($ciphertext, ENCRYPTION_CIPHER, $key, OPENSSL_RAW_DATA, $iv);
+        return $decrypted === false ? null : $decrypted;
+    } catch (Exception $e) {
+        error_log("Error de desencriptación: " . $e->getMessage());
+        return null;
+    }
 }
 
 /**
