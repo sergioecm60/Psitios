@@ -6,8 +6,6 @@ declare(strict_types=1);
 // Establecer zona horaria a Buenos Aires
 date_default_timezone_set('America/Argentina/Buenos_Aires');
 
-ob_start();
-
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
@@ -63,17 +61,8 @@ function get_pdo_connection() {
             
         } catch (PDOException $e) {
             error_log("Error de conexión a la base de datos: " . $e->getMessage());
-            if (php_sapi_name() === 'cli') {
-                echo "Error de conexión a la base de datos\n";
-            } elseif (is_api_request()) {
-                http_response_code(500);
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'message' => 'Error de conexión a la base de datos. Verifique las credenciales en el archivo .env y que el servidor de base de datos esté en ejecución.']);
-            } else {
-                http_response_code(500);
-                echo "Error de conexión a la base de datos. Verifique la configuración.";
-            }
-            exit(1);
+            // Re-lanzar la excepción para que sea capturada por el manejador de errores del endpoint.
+            throw new PDOException("Error de conexión a la base de datos. Verifique la configuración.", (int)$e->getCode(), $e);
         }
     }
     
@@ -108,24 +97,17 @@ function is_api_request() {
 }
 
 // Configurar manejo de errores para peticiones API
-set_error_handler(function($severity, $message, $file, $line) {
-    if (is_api_request()) {
-        error_log("Error PHP: $message en $file:$line");
-        http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Error interno del servidor']);
-        exit;
+// Convertir todos los errores (warnings, notices, etc.) en excepciones.
+// Esto asegura que sean capturados por los bloques try/catch en los endpoints de la API.
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) {
+        // Este código de error no está incluido en error_reporting
+        return;
     }
-    return false; // Usar el manejador por defecto para peticiones web normales
+    throw new ErrorException($message, 0, $severity, $file, $line);
 });
 
-set_exception_handler(function($exception) {
-    if (is_api_request()) {
-        error_log("Excepción no capturada: " . $exception->getMessage());
-        http_response_code(500);
-        header('Content-Type: application/json');
-        echo json_encode(['success' => false, 'message' => 'Error interno del servidor']);
-        exit;
-    }
-    throw $exception; // Re-lanzar para peticiones web normales
-});
+// El manejador de excepciones global (`set_exception_handler`) se elimina.
+// La responsabilidad de capturar excepciones ahora recae completamente en los
+// bloques `try/catch (Throwable $e)` de cada script de la API,
+// lo que evita terminaciones abruptas y respuestas vacías.

@@ -340,7 +340,7 @@ error_reporting(E_ALL);
                 </div>
                 <div class="form-group">
                     <label for="site-username">Usuario</label>
-                    <input type="text" id="site-username" name="username">
+                    <input type="text" id="site-username" name="username" autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label for="site-password">Nueva Contraseña (opcional)</label>
@@ -432,15 +432,47 @@ error_reporting(E_ALL);
             if (body) {
                 options.body = JSON.stringify(body);
             }
+            
             try {
+                console.log('🔄 API Call to:', url, options);
+                
                 const response = await fetch(url, options);
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || `Error ${response.status}`);
+                
+                console.log('📡 Response status:', response.status);
+                console.log('📡 Response headers:', [...response.headers.entries()]);
+                
+                // ✅ CORRECCIÓN: Leer el texto UNA SOLA VEZ
+                const text = await response.text();
+                console.log('📝 Raw response text:', text);
+                console.log('📏 Text length:', text.length);
+                
+                if (!text || text.trim() === '') {
+                    throw new Error(`Respuesta vacía del servidor (Estado: ${response.status})`);
                 }
-                return response.json();
+
+                // ✅ CORRECCIÓN: Parsear el texto ya leído
+                let data;
+                try {
+                    data = JSON.parse(text);
+                    console.log('✅ Parsed JSON:', data);
+                } catch (parseError) {
+                    console.error('❌ Error parsing JSON:', parseError);
+                    console.error('📄 Response text:', text);
+                    throw new Error('Respuesta del servidor no es JSON válido: ' + text.substring(0, 100));
+                }
+
+                // ✅ CORRECCIÓN: Verificar el estado después de parsear
+                if (!response.ok) {
+                    let errorMessage = data.message || `Error ${response.status}`;
+                    if (data.error) {
+                        errorMessage += `\nDetalles: ${data.error}`;
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                return data;
             } catch (error) {
-                console.error('Error en la llamada API:', error);
+                console.error('💥 API Call Error:', error);
                 alert('Error: ' + error.message);
                 return null;
             }
@@ -465,8 +497,8 @@ error_reporting(E_ALL);
             return unsafe
                  .toString()
                  .replace(/&/g, "&amp;")
-                 .replace(/</g, "<")
-                 .replace(/>/g, ">")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
                  .replace(/"/g, "&quot;")
                  .replace(/'/g, "&#039;");
         }
@@ -961,9 +993,11 @@ error_reporting(E_ALL);
         });
 
         sitesTableBody.addEventListener('click', async (e) => {
-            if (e.target.classList.contains('edit-site-btn')) {
+            // ✅ Detectar clic en botón de editar (aunque sea en el texto)
+            const editBtn = e.target.closest('.edit-site-btn');
+            if (editBtn) {
                 e.preventDefault();
-                const id = e.target.dataset.siteId;
+                const id = editBtn.dataset.siteId;
                 const result = await apiCall(`api/manage_sites.php?action=get&id=${id}`);
                 if (result && result.success) {
                     const site = result.data;
@@ -979,10 +1013,12 @@ error_reporting(E_ALL);
                 }
             }
 
-            if (e.target.classList.contains('delete-site-btn')) {
+            // ✅ Detectar clic en botón de eliminar
+            const deleteBtn = e.target.closest('.delete-site-btn');
+            if (deleteBtn) {
                 e.preventDefault();
                 if (!confirm('¿Eliminar este sitio? Esta acción no se puede deshacer.')) return;
-                const id = e.target.dataset.siteId;
+                const id = deleteBtn.dataset.siteId;
                 const result = await apiCall('api/manage_sites.php', 'POST', { action: 'delete', id: id });
                 if (result && result.success) {
                     fetchSites();
