@@ -1,3 +1,19 @@
+// --- Global Functions for Modals ---
+// These need to be global to be called by `onclick` attributes in the HTML.
+function openModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.add('active'); // Use class for display
+    }
+}
+
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.classList.remove('active'); // Use class for display
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     const csrfToken = document.getElementById('csrf_token')?.value;
     const adminId = document.getElementById('admin_id')?.value;
@@ -34,20 +50,23 @@ document.addEventListener('DOMContentLoaded', function() {
             const activeTabContent = document.getElementById(tab.dataset.tab);
             if (activeTabContent) activeTabContent.classList.add('active');
             
-            // Cargar contenido solo si se hace clic en la pestaña de agenda
+            // Cargar contenido de la pestaña de agenda al hacer clic
             if (tab.dataset.tab === 'agenda-tab') loadAgenda();
         });
     });
 
-    // Abrir/cerrar chat
-    chatToggleBtn.addEventListener('click', () => chatModal.classList.add('active'));
+    // --- Generic Modal Handling ---
+    chatToggleBtn?.addEventListener('click', () => openModal('chat-modal'));
+
     document.querySelectorAll('.close-button').forEach(btn => {
-        btn.addEventListener('click', () => chatModal.classList.remove('active'));
+        btn.addEventListener('click', () => {
+            const modalId = btn.dataset.modalId;
+            if (modalId) closeModal(modalId);
+        });
     });
+
     window.addEventListener('click', e => {
-        if (e.target === chatModal) {
-            chatModal.classList.remove('active');
-        }
+        if (e.target.classList.contains('modal')) e.target.classList.remove('active');
     });
 
     // Enviar mensaje
@@ -147,6 +166,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // --- CARGAR SITIOS ---
+    async function fetchAdminSites() {
+        const grid = document.getElementById('admin-sites-grid');
+        if (!grid) return;
+        grid.innerHTML = '<div class="loading">Cargando sitios...</div>';
+        try {
+            const result = await apiCall('api/get_user_sites.php');
+            if (result.success && result.data.length > 0) {
+                grid.innerHTML = result.data.map(service => createServiceCard(service, true)).join('');
+            } else if (result.success) {
+                grid.innerHTML = '<p>No tienes sitios asignados por el administrador.</p>';
+            } else {
+                grid.innerHTML = `<p class="error">❌ ${result.message || 'Error al cargar sitios.'}</p>`;
+            }
+        } catch (error) {
+            grid.innerHTML = `<p class="error">❌ Error de conexión al cargar sitios.</p>`;
+        }
+    }
+
     async function fetchUserSites() {
         const grid = document.getElementById('user-sites-grid');
         if (!grid) return;
@@ -179,8 +217,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isPersonal ? 'personal' : 'assigned'}">👁️ Ver</button>` : ''}
                     ${isAssigned ? `<button class="btn-notify-expired" data-id="${id}" ${item.password_needs_update ? 'disabled' : ''}>⏳ Notificar</button>` : ''}
                     ${isAssigned ? `<button class="btn-report-problem" data-site-id="${siteId}">🚨 Reportar</button>` : ''}
-                    ${isPersonal ? `<button class="btn btn-sm btn-secondary btn-edit-site" data-id="${id}">✏️ Editar</button>` : ''}
-                    ${isPersonal ? `<button class="btn btn-sm btn-danger btn-delete-site" data-id="${id}">🗑️ Eliminar</button>` : ''}
+                    ${isPersonal ? `<button class="btn btn-sm btn-secondary btn-edit-site" data-id="${id}" data-type="personal">✏️ Editar</button>` : ''}
+                    ${isPersonal ? `<button class="btn btn-sm btn-danger btn-delete-site" data-id="${id}" data-type="personal">🗑️ Eliminar</button>` : ''}
                 </div>
                 <div class="creds-display hidden" id="creds-${isPersonal ? 'p' : 'a'}-${id}"></div>
             </div>
@@ -188,8 +226,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Carga inicial de la primera pestaña
-    fetchUserSites(); // Carga sitios personales
-    // fetchAdminSites() se puede llamar aquí si se decide mantener la pestaña separada
+    fetchAdminSites();
+    fetchUserSites();
 
     // --- MANEJO DE BOTONES DE SITIOS (VER, NOTIFICAR, REPORTAR) ---
     document.querySelector('.container').addEventListener('click', async (e) => {
@@ -299,6 +337,24 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        const editSiteBtn = e.target.closest('.btn-edit-site');
+        if (editSiteBtn) {
+            const id = editSiteBtn.dataset.id;
+            const result = await apiCall(`api/get_user_sites_personal.php?id=${id}`);
+            if (result.success) {
+                const site = result.data;
+                const form = document.getElementById('user-site-form');
+                form.reset();
+                document.getElementById('user-site-modal-title').textContent = 'Editar Sitio Personal';
+                document.getElementById('user-site-id').value = site.id;
+                document.getElementById('user-site-name').value = site.name;
+                document.getElementById('user-site-url').value = site.url;
+                document.getElementById('user-site-username').value = site.username;
+                document.getElementById('user-site-notes').value = site.notes;
+                openModal('user-site-modal');
+            }
+        }
+
         const deleteSiteBtn = e.target.closest('.btn-delete-site');
         if (deleteSiteBtn) {
             if (!confirm('¿Estás seguro de que quieres eliminar este sitio personal?')) return;
@@ -315,6 +371,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- AGENDA PERSONAL ---
     const agendaTableBody = document.querySelector('#agenda-table tbody');
+    const reminderModal = document.getElementById('reminder-modal');
+    const reminderForm = document.getElementById('reminder-form');
+    const reminderTypeSelect = document.getElementById('reminder-type');
+
+    document.getElementById('add-reminder-btn')?.addEventListener('click', () => {
+        reminderForm.reset();
+        document.getElementById('reminder-id').value = '';
+        document.getElementById('reminder-modal-title').textContent = 'Añadir Recordatorio';
+        // Asegurarse de que los campos de credenciales se muestren u oculten correctamente
+        toggleCredentialFields(); 
+        openModal('reminder-modal');
+    });
 
     async function loadAgenda() {
         if (!agendaTableBody) return;
@@ -328,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <td>${item.type === 'credential' ? '🔑' : '📝'}</td>
                     <td>${escapeHTML(item.title)}</td>
                     <td>${escapeHTML(item.username || '')}</td>
-                    <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}">Mostrar</button>` : ''}</td>
+                    <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-type="reminder">Mostrar</button>` : ''}</td>
                     <td>${escapeHTML(item.notes || '')}</td>
                     <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString() : ''}</td>
                     <td><button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
@@ -375,6 +443,54 @@ document.addEventListener('DOMContentLoaded', function() {
                 action: 'toggle_complete',
                 id: id
             });
+        }
+    });
+
+    // --- LÓGICA DE MODALES ---
+
+    // Modal de Sitios Personales
+    document.getElementById('add-user-site-btn')?.addEventListener('click', () => {
+        const form = document.getElementById('user-site-form');
+        form.reset();
+        document.getElementById('user-site-id').value = '';
+        document.getElementById('user-site-modal-title').textContent = 'Agregar Sitio Personal';
+        openModal('user-site-modal');
+    });
+
+    document.getElementById('user-site-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        const result = await apiCall('api/save_user_site.php', 'POST', data);
+        if (result.success) {
+            closeModal('user-site-modal');
+            fetchUserSites();
+        } else {
+            alert('Error: ' + result.message);
+        }
+    });
+
+    // Modal de Agenda
+    function toggleCredentialFields() {
+        const type = reminderTypeSelect.value;
+        const fields = reminderModal.querySelectorAll('.credential-field');
+        fields.forEach(field => {
+            field.style.display = type === 'credential' ? 'block' : 'none';
+        });
+    }
+
+    reminderTypeSelect?.addEventListener('change', toggleCredentialFields);
+
+    reminderForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        const result = await apiCall('api/save_user_reminder.php', 'POST', data);
+        if (result.success) {
+            closeModal('reminder-modal');
+            loadAgenda();
+        } else {
+            alert('Error: ' + result.message);
         }
     });
 
