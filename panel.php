@@ -60,7 +60,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <div class="loading">Cargando sitios...</div>
             </div>
             
-            <hr style="margin: 30px 0; border: 1px solid #eee;">
+            <hr class="content-divider">
 
             <h2>🔐 Mis Sitios Personales</h2>
             <button class="btn btn-primary" id="add-user-site-btn">+ Agregar Sitio Personal</button>
