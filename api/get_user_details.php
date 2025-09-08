@@ -1,4 +1,9 @@
 <?php
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 header('Content-Type: application/json');
 
 // Carga centralizada de configuración, dependencias y funciones.
@@ -52,3 +57,8 @@ try {
     http_response_code(500); // Internal Server Error
     echo json_encode(['success' => false, 'message' => 'Error al consultar la base de datos: ' . $e->getMessage()]);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;

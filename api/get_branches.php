@@ -13,7 +13,7 @@ header('Content-Type: application/json');
 try {
     $pdo = get_pdo_connection();
     
-    $company_id = filter_input(INPUT_GET, 'company_id', FILTER_VALIDATE_INT);
+    $company_id = filter_input(INPUT_GET, 'company_id', FILTER_VALIDATE_INT) ?: null;
     
     if ($company_id) {
         $stmt = $pdo->prepare("

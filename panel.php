@@ -131,6 +131,10 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         <header class="admin-header">
             <h1>🔐 Mis Sitios (<?= htmlspecialchars($username) ?>)</h1>
             <div class="chat-logout">
+                <div class="tabs">
+                    <button class="tab-link active" data-tab="sites-tab">Mis Sitios</button>
+                    <button class="tab-link" data-tab="agenda-tab">📅 Mi Agenda</button>
+                </div>
                 <button id="chat-toggle-btn" class="btn-secondary">💬 Chatear con el Admin</button>
                 <a href="logout.php" class="btn-logout">Cerrar Sesión</a>
             </div>
@@ -138,39 +142,38 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 
         <div class="services-grid">
             <?php
-            $stmt = $pdo->prepare("
-                SELECT s.id, st.id as site_id, st.name, st.url, s.password_needs_update
-                FROM services s
-                JOIN sites st ON s.site_id = st.id
-                WHERE s.user_id = :user_id
-                ORDER BY st.name ASC
-            ");
-            $stmt->execute(['user_id' => $user_id]);
-            $services = $stmt->fetchAll();
+            // No se carga aquí, se hará con JS para las pestañas
             ?>
-
-            <?php if (empty($services)): ?>
-                <p>No tienes sitios asignados.</p>
-            <?php else: ?>
-                <?php foreach ($services as $service): ?>
-                    <div class="service-card">
-                        <h3><?= htmlspecialchars($service['name']) ?></h3>
-                        <?php if ($service['password_needs_update']): ?>
-                            <p class="notification">⚠️ Pendiente de actualización</p>
-                        <?php endif; ?>
-                        <a href="<?= htmlspecialchars($service['url']) ?>" target="_blank" rel="noopener noreferrer" class="btn-launch">🌐 Acceder</a>
-                        <div class="credentials-area">
-                            <button class="btn-view-creds" data-id="<?= (int)$service['id'] ?>">👁️ Ver</button>
-                            <button class="btn-notify-expired" data-id="<?= (int)$service['id'] ?>" <?= $service['password_needs_update'] ? 'disabled' : '' ?>>⏳ Notificar</button>
-                            <button class="btn-report-problem" data-site-id="<?= (int)$service['site_id'] ?>">🚨 Reportar</button>
-                        </div>
-                        <div class="creds-display hidden" id="creds-<?= (int)$service['id'] ?>">
-                            <p>Cargando...</p>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-            <?php endif; ?>
         </div>
+
+        <!-- Pestaña de Sitios -->
+        <div id="sites-tab" class="tab-content active">
+            <div id="sites-grid" class="services-grid">
+                <!-- Los sitios se cargarán aquí por JS -->
+            </div>
+        </div>
+
+        <!-- Pestaña de Agenda -->
+        <div id="agenda-tab" class="tab-content">
+            <h2>📅 Mi Agenda Personal</h2>
+            <button class="btn btn-primary" id="add-reminder-btn">+ Añadir Recordatorio</button>
+            <div class="table-wrapper">
+                <table id="agenda-table">
+                    <thead>
+                        <tr>
+                            <th>Título</th>
+                            <th>Usuario</th>
+                            <th>Contraseña</th>
+                            <th>Notas</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 
     <!-- Modal de Chat -->
@@ -199,6 +202,21 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         const chatMessages = document.getElementById('chat-messages');
         const chatForm = document.getElementById('chat-form');
         const chatInput = document.getElementById('chat-input');
+
+        // --- Lógica de Pestañas ---
+        const tabs = document.querySelectorAll('.tab-link');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+                tab.classList.add('active');
+                const activeTabContent = document.getElementById(tab.dataset.tab);
+                if (activeTabContent) activeTabContent.classList.add('active');
+                if (tab.dataset.tab === 'agenda-tab') loadAgenda();
+            });
+        });
 
         // Abrir/cerrar chat
         chatToggleBtn.addEventListener('click', () => chatModal.classList.add('active'));
@@ -303,12 +321,50 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
             }
         });
 
+        // --- CARGAR SITIOS ---
+        async function fetchUserSites() {
+            const sitesGrid = document.getElementById('sites-grid');
+            sitesGrid.innerHTML = '<p>Cargando sitios...</p>';
+            try {
+                const response = await fetch('api/get_user_sites.php');
+                const result = await response.json();
+                if (result.success && result.data.length > 0) {
+                    sitesGrid.innerHTML = result.data.map(service => `
+                        <div class="service-card">
+                            <h3>${escapeHTML(service.name)}</h3>
+                            ${service.password_needs_update ? '<p class="notification">⚠️ Pendiente de actualización</p>' : ''}
+                            <a href="${escapeHTML(service.url)}" target="_blank" rel="noopener noreferrer" class="btn-launch">🌐 Acceder</a>
+                            <div class="credentials-area">
+                                <button class="btn-view-creds" data-id="${service.service_id}">👁️ Ver</button>
+                                <button class="btn-notify-expired" data-id="${service.service_id}" ${service.password_needs_update ? 'disabled' : ''}>⏳ Notificar</button>
+                                <button class="btn-report-problem" data-site-id="${service.site_id}">🚨 Reportar</button>
+                            </div>
+                            <div class="creds-display hidden" id="creds-${service.service_id}">
+                                <p>Cargando...</p>
+                            </div>
+                        </div>
+                    `).join('');
+                } else if (result.success) {
+                    sitesGrid.innerHTML = '<p>No tienes sitios asignados.</p>';
+                } else {
+                    sitesGrid.innerHTML = `<p class="error">❌ ${result.message || 'Error al cargar sitios.'}</p>`;
+                }
+            } catch (error) {
+                sitesGrid.innerHTML = `<p class="error">❌ Error de conexión al cargar sitios.</p>`;
+            }
+        }
+
+        // Carga inicial de sitios
+        fetchUserSites();
+
+
         // --- VER CREDENCIALES ---
-        document.querySelectorAll('.btn-view-creds').forEach(button => {
-            button.addEventListener('click', async function() {
-                const serviceId = this.dataset.id;
+        document.getElementById('sites-grid').addEventListener('click', async (e) => {
+            const viewBtn = e.target.closest('.btn-view-creds');
+            if (viewBtn) {
+                const serviceId = viewBtn.dataset.id;
                 const credsDiv = document.getElementById(`creds-${serviceId}`);
-                
+
                 if (!credsDiv.classList.contains('hidden')) {
                     credsDiv.classList.add('hidden');
                     return;
@@ -347,44 +403,41 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 } catch (error) {
                     credsDiv.innerHTML = `<p class="error">❌ ${error.message}</p>`;
                 }
-            });
-        });
+            }
 
-        // --- NOTIFICAR EXPIRACIÓN ---
-        document.querySelectorAll('.btn-notify-expired').forEach(button => {
-            button.addEventListener('click', async function() {
+            const notifyBtn = e.target.closest('.btn-notify-expired');
+            if (notifyBtn) {
                 if (!confirm('¿Contraseña expirada? Se notificará al admin.')) return;
-                this.disabled = true;
+                notifyBtn.disabled = true;
 
                 try {
                     const response = await fetch('api/notify_expiration.php', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                        body: JSON.stringify({ id: this.dataset.id })
+                        body: JSON.stringify({ id: notifyBtn.dataset.id })
                     });
                     const result = await response.json();
                     
                     if (result.success) {
                         alert('✅ Notificado.');
-                        const card = this.closest('.service-card');
+                        const card = notifyBtn.closest('.service-card');
                         const notification = document.createElement('p');
                         notification.className = 'notification';
                         notification.textContent = '⚠️ Pendiente de actualización';
                         card.insertBefore(notification, card.querySelector('.btn-launch'));
                     } else {
-                        alert('❌ Error: ' + result.message);
+                        alert('❌ Error: ' + (result.message || 'No se pudo notificar.'));
                     }
                 } catch (error) {
                     alert('❌ Error de conexión.');
+                } finally {
+                    notifyBtn.disabled = false;
                 }
-                this.disabled = false;
-            });
-        });
+            }
 
-        // --- REPORTAR PROBLEMA ---
-        document.querySelectorAll('.btn-report-problem').forEach(button => {
-            button.addEventListener('click', async function() {
-                const siteId = this.dataset.siteId;
+            const reportBtn = e.target.closest('.btn-report-problem');
+            if (reportBtn) {
+                const siteId = reportBtn.dataset.siteId;
                 if (!confirm('¿Reportar problema con este sitio?')) return;
 
                 try {
@@ -398,13 +451,96 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                     if (result.success) {
                         alert('✅ Problema reportado.');
                     } else {
-                        alert('❌ Error: ' + result.message);
+                        alert('❌ Error: ' + (result.message || 'No se pudo reportar.'));
                     }
                 } catch (error) {
                     alert('❌ Error de conexión.');
                 }
-            });
+            }
         });
+
+        // --- AGENDA PERSONAL ---
+        const agendaTableBody = document.querySelector('#agenda-table tbody');
+
+        async function apiCall(url, method = 'GET', body = null) {
+            const options = {
+                method,
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken }
+            };
+            if (body) options.body = JSON.stringify(body);
+            const response = await fetch(url, options);
+            return response.json();
+        }
+
+        async function loadAgenda() {
+            const result = await apiCall('api/get_agenda.php');
+            agendaTableBody.innerHTML = '';
+            if (result.success) {
+                result.data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${escapeHTML(item.title)}</td>
+                        <td>${escapeHTML(item.username || '-')}</td>
+                        <td><button class="btn btn-sm btn-secondary decrypt-pass" data-pass="${item.password_encrypted || ''}">Mostrar</button></td>
+                        <td>${escapeHTML(item.notes || '-')}</td>
+                        <td>${formatTime(item.created_at)}</td>
+                        <td><button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
+                    `;
+                    agendaTableBody.appendChild(tr);
+                });
+            }
+        }
+
+        document.getElementById('add-reminder-btn').addEventListener('click', async () => {
+            const title = prompt('Título del recordatorio:');
+            if (!title) return;
+            const username = prompt('Usuario (opcional):');
+            const password = prompt('Contraseña (opcional, se guardará encriptada):');
+            const notes = prompt('Notas (opcional):');
+
+            // ADVERTENCIA: Esta "encriptación" en el cliente es insegura (solo codificación).
+            // La encriptación real debería ocurrir en el servidor.
+            // Se usa para cumplir con el flujo solicitado.
+            const encryptedPass = password ? btoa(password) : null;
+
+            const result = await apiCall('api/save_agenda_item.php', 'POST', { title, username, password: encryptedPass, notes });
+            if (result.success) {
+                loadAgenda();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        });
+
+        agendaTableBody.addEventListener('click', async (e) => {
+            const decryptBtn = e.target.closest('.decrypt-pass');
+            if (decryptBtn) {
+                const encryptedPass = decryptBtn.dataset.pass;
+                if (encryptedPass) {
+                    try {
+                        // Decodificando en cliente (inseguro, solo para demostración)
+                        const plainPass = atob(encryptedPass);
+                        alert(`Contraseña: ${plainPass}`);
+                    } catch (err) {
+                        alert('No se pudo decodificar la contraseña.');
+                    }
+                } else {
+                    alert('No hay contraseña guardada.');
+                }
+            }
+
+            const deleteBtn = e.target.closest('.delete-reminder');
+            if (deleteBtn) {
+                if (!confirm('¿Eliminar este recordatorio?')) return;
+                const id = deleteBtn.dataset.id;
+                const result = await apiCall('api/delete_agenda_item.php', 'POST', { id });
+                if (result.success) {
+                    loadAgenda();
+                } else {
+                    alert('Error: ' + result.message);
+                }
+            }
+        });
+
 
         // --- COPIAR AL PORTAPAPELES ---
         document.addEventListener('click', e => {

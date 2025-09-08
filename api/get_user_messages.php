@@ -4,6 +4,11 @@
  * Devuelve los mensajes enviados por usuarios al administrador autenticado.
  */
 
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 require_once '../bootstrap.php';
 require_auth('admin'); // Solo administradores
 
@@ -41,3 +46,8 @@ try {
         'message' => 'Error al cargar mensajes'
     ]);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;

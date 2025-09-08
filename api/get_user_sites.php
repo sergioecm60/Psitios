@@ -16,7 +16,7 @@ try {
     $user_id = $_SESSION['user_id'];
 
     $stmt = $pdo->prepare("
-        SELECT s.id, s.name, s.url, s.username, s.password_needs_update, s.notes
+        SELECT svc.id as service_id, s.id as site_id, s.name, s.url, s.username, s.password_needs_update, s.notes
         FROM sites s
         JOIN services svc ON s.id = svc.site_id
         WHERE svc.user_id = ?
@@ -26,7 +26,8 @@ try {
     $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($sites as &$s) {
-        $s['id'] = (int)$s['id'];
+        $s['service_id'] = (int)$s['service_id'];
+        $s['site_id'] = (int)$s['site_id'];
         $s['password_needs_update'] = (bool)$s['password_needs_update'];
     }
 

@@ -20,6 +20,7 @@ try {
     $method = $_SERVER['REQUEST_METHOD'];
     $pdo = get_pdo_connection();
     $current_user_id = $_SESSION['user_id'] ?? null;
+    $current_user_department_id = $_SESSION['department_id'] ?? null;
     $user_role = $_SESSION['user_role'] ?? 'user';
 
     if (!$current_user_id) {
@@ -33,12 +34,14 @@ try {
             $action = $_GET['action'] ?? null;
 
             if ($action === 'list') {
-                $sql = "SELECT id, name, url, username, password_needs_update, notes, created_by FROM sites";
+                $sql = "SELECT s.id, s.name, s.url, s.username, s.password_needs_update, s.notes, s.created_by, d.name as department_name 
+                        FROM sites s
+                        LEFT JOIN departments d ON s.department_id = d.id";
                 $params = [];
 
-                if ($user_role === 'admin') {
-                    $sql .= " WHERE created_by = ?";
-                    $params[] = $current_user_id;
+                if ($user_role === 'admin' && $current_user_department_id) {
+                    $sql .= " WHERE s.department_id = ?";
+                    $params[] = $current_user_department_id;
                 }
 
                 $sql .= " ORDER BY name ASC";
@@ -71,8 +74,9 @@ try {
                 }
                 // 🟡 El admin solo ve sus sitios
                 elseif ($user_role === 'admin') {
-                    $stmt = $pdo->prepare("SELECT * FROM sites WHERE id = ? AND created_by = ?");
-                    $stmt->execute([$id, $current_user_id]);
+                    // ✅ MEJORA: Filtrar por departamento para consistencia
+                    $stmt = $pdo->prepare("SELECT * FROM sites WHERE id = ? AND department_id = ?");
+                    $stmt->execute([$id, $current_user_department_id]);
                 }
                 // 🔴 Acceso denegado
                 else {
@@ -142,8 +146,9 @@ try {
                 $params = [$id];
 
                 if ($user_role === 'admin') {
-                    $sql .= " AND created_by = ?";
-                    $params[] = $current_user_id;
+                    // ✅ MEJORA: Filtrar por departamento para consistencia
+                    $sql .= " AND department_id = ?";
+                    $params[] = $current_user_department_id;
                 }
 
                 $stmt = $pdo->prepare($sql);
@@ -182,9 +187,10 @@ try {
                     $check_sql .= " AND id != ?";
                     $check_params[] = $id;
                 }
-                if ($user_role === 'admin') {
-                    $check_sql .= " AND created_by = ?";
-                    $check_params[] = $current_user_id;
+                // ✅ MEJORA: La validación de duplicados debe ser por departamento para los admins
+                if ($user_role === 'admin' && $current_user_department_id) {
+                    $check_sql .= " AND department_id = ?";
+                    $check_params[] = $current_user_department_id;
                 }
 
                 $stmt = $pdo->prepare($check_sql);
@@ -233,8 +239,9 @@ try {
                     $params[] = $id;
 
                     if ($user_role === 'admin') {
-                        $sql .= " AND created_by = ?";
-                        $params[] = $current_user_id;
+                        // ✅ MEJORA: Filtrar por departamento para consistencia
+                        $sql .= " AND department_id = ?";
+                        $params[] = $current_user_department_id;
                     }
 
                     $stmt = $pdo->prepare($sql);
@@ -248,23 +255,28 @@ try {
                     }
 
                 } else {
+                    $department_id = null;
+                    if ($user_role === 'admin') {
+                        $department_id = $current_user_department_id;
+                    }
+
                     if ($encrypted_data) {
                         $stmt = $pdo->prepare("
-                            INSERT INTO sites (name, url, username, password_encrypted, iv, password_needs_update, notes, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            INSERT INTO sites (name, url, username, password_encrypted, iv, password_needs_update, notes, created_by, department_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         ");
                         $stmt->execute([
                             $name, $url, $username,
                             $encrypted_data['ciphertext'],
                             $encrypted_data['iv'],
-                            $needs_update, $notes, $current_user_id
+                            $needs_update, $notes, $current_user_id, $department_id
                         ]);
                     } else {
                         $stmt = $pdo->prepare("
-                            INSERT INTO sites (name, url, username, password_needs_update, notes, created_by)
-                            VALUES (?, ?, ?, ?, ?, ?)
+                            INSERT INTO sites (name, url, username, password_needs_update, notes, created_by, department_id)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
                         ");
-                        $stmt->execute([$name, $url, $username, $needs_update, $notes, $current_user_id]);
+                        $stmt->execute([$name, $url, $username, $needs_update, $notes, $current_user_id, $department_id]);
                     }
 
                     $newId = $pdo->lastInsertId();

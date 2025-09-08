@@ -5,6 +5,11 @@
  * El mensaje se elimina solo de su vista (versión soft).
  */
 
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 require_once '../bootstrap.php';
 require_auth(); // Cualquier usuario autenticado
 
@@ -79,3 +84,8 @@ try {
         'message' => 'Error al eliminar el mensaje.'
     ]);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;

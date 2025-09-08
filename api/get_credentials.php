@@ -6,6 +6,11 @@
  * verificando que el usuario tenga acceso a él.
  */
 
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 require_once '../bootstrap.php';
 require_auth(); // Requiere que el usuario esté logueado
 
@@ -76,3 +81,8 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error interno del servidor.']);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;

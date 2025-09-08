@@ -24,6 +24,35 @@ SET time_zone = "+00:00";
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `departments`
+--
+
+CREATE TABLE `departments` (
+  `id` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `company_id` int DEFAULT NULL,
+  `branch_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `departments`
+--
+
+INSERT INTO `departments` (`id`, `name`, `company_id`, `branch_id`, `created_at`) VALUES
+(1, 'Administración', 1, 1, '2025-09-05 15:00:00'),
+(2, 'Ventas', 1, 1, '2025-09-05 15:00:00'),
+(3, 'Contaduría', 1, 1, '2025-09-05 15:00:00'),
+(4, 'Recepción', 1, 2, '2025-09-05 15:00:00'),
+(5, 'Operaciones', 1, 2, '2025-09-05 15:00:00'),
+(6, 'Atención al Cliente', 2, 3, '2025-09-05 15:00:00'),
+(7, 'Caja', 2, 3, '2025-09-05 15:00:00'),
+(8, 'Auditoría', 1, 1, '2025-09-05 15:00:00'),
+(9, 'Coordinación', 1, 1, '2025-09-05 15:00:00');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `audit_logs`
 --
 
@@ -86,27 +115,6 @@ INSERT INTO `companies` (`id`, `name`, `created_at`) VALUES
 (1, 'Prueba', '2025-09-03 15:35:36'),
 (2, 'Prueba2', '2025-09-03 15:35:45'),
 (3, 'Empresa Loca', '2025-09-04 17:02:15');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `departments`
---
-
-CREATE TABLE `departments` (
-  `id` int NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `company_id` int DEFAULT NULL,
-  `branch_id` int DEFAULT NULL,
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
-
---
--- Dumping data for table `departments`
---
-
-INSERT INTO `departments` (`id`, `name`, `company_id`, `branch_id`, `created_at`) VALUES
-(1, 'Administración', 1, 1, '2025-09-05 15:00:00');
 
 -- --------------------------------------------------------
 
@@ -567,7 +575,7 @@ CREATE TABLE `sites` (
 
 INSERT INTO `sites` (`id`, `name`, `url`, `username`, `password_encrypted`, `iv`, `password_needs_update`, `notes`, `created_by`) VALUES
 (8, 'Proxmox', 'https://10.10.0.1:8006', 'root', 0x684b7775345942517a497a305562657832655a6258773d3d, 0xb1660c5ebc2df2e3d4e7cca161372187, 0, 'Proxmox 9 Testing', 0),
-(9, 'Cloud Panel', 'https://10.10.0.50:8443', 'root', 0x3957345565434658695074416b6e42316b6e547138513d3d, 0x9577ef7f8b582fd40e7791d76a7dafa5, 0, 'Cloud Panel Testing', 0),
+(9, 'Cloud Panel', 'https://10.10.0.50:8443', 'root', 0x3957345565434658695074416b6e42316b6e547138513d3d, 0x9577ef7f8b582fd40e7791d76a7dafa5, 0, 'Cloud Panel Testing', 1),
 (11, 'test', 'http://192.168.0.1', 'root', NULL, NULL, 0, 'un test', 1);
 
 -- --------------------------------------------------------
@@ -597,10 +605,26 @@ CREATE TABLE `users` (
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `company_id`, `branch_id`, `assigned_admin_id`, `is_active`, `department_id`, `created_at`, `created_by`) VALUES
 (1, 'admin', '$2y$10$NlguZUw9cO1.weM9Sw2sL.1B61BTQNhv/5do/Z66SLZOR8Zo7OdIy', 'superadmin', NULL, NULL, NULL, 1, NULL, '2025-08-27 19:37:58', NULL),
 (7, 'BrianF', '$2y$10$c1TokUq/pEiBgwV07Gpl0ekWFJu6gcjhurDZMBuaWiGrsH30CzMcq', 'admin', 1, 1, NULL, 1, 1, '2025-08-29 14:23:03', 1),
-(8, 'juanp', '$2y$10$XTEQVVrGcECeUU2/5xU0ceTTOqhyeo2GifgIHDyMUprTItE7HgSQu', 'user', 2, 3, 1, 1, NULL, '2025-08-29 20:10:43', 1),
-(9, 'pepea', '$2y$10$3NAssuFIKCg1WGSTurI1BOR8tsp3dQ92tOQ8O/QL6BOV0sUmzN/BK', 'user', 1, 1, 1, 1, 1, '2025-09-02 16:21:49', 7);
+(8, 'juanp', '$2y$10$XTEQVVrGcECeUU2/5xU0ceTTOqhyeo2GifgIHDyMUprTItE7HgSQu', 'user', 2, 3, 1, 1, 1, '2025-08-29 20:10:43', 7),
+(9, 'pepea', '$2y$10$3NAssuFIKCg1WGSTurI1BOR8tsp3dQ92tOQ8O/QL6BOV0sUmzN/BK', 'user', 1, 1, 1, 1, 1, '2025-09-02 16:21:49', 7),
+(12, 'vendedor1', '$2y$10$0GZkGeaI.o0iXzYf.PzLHe8vjJ2dZ.j/g.k/j.k/j.k/j.k/j', 'user', 1, 2, 13, 1, 2, '2025-09-05 14:56:46', 13),
+(13, 'admin_ventas', '$2y$10$0GZkGeaI.o0iXzYf.PzLHe8vjJ2dZ.j/g.k/j.k/j.k/j', 'admin', 1, 2, NULL, 1, 2, '2025-09-05 14:57:15', 1);
 
 -- --------------------------------------------------------
+
+--
+-- Table structure for table `user_agenda`
+--
+
+CREATE TABLE `user_agenda` (
+  `id` int NOT NULL,
+  `user_id` int NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `username` varchar(255) DEFAULT NULL,
+  `password_encrypted` text,
+  `notes` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Table structure for table `user_sites`
@@ -725,6 +749,13 @@ ALTER TABLE `user_sites`
   ADD KEY `site_id` (`site_id`);
 
 --
+-- Indexes for table `user_agenda`
+--
+ALTER TABLE `user_agenda`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
 -- AUTO_INCREMENT for dumped tables
 --
 
@@ -756,7 +787,7 @@ ALTER TABLE `countries`
 -- AUTO_INCREMENT for table `departments`
 --
 ALTER TABLE `departments`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
 
 --
 -- AUTO_INCREMENT for table `messages`
@@ -798,12 +829,18 @@ ALTER TABLE `sites`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
 
 --
 -- AUTO_INCREMENT for table `user_sites`
 --
 ALTER TABLE `user_sites`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `user_agenda`
+--
+ALTER TABLE `user_agenda`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
@@ -822,13 +859,6 @@ ALTER TABLE `audit_logs`
 --
 ALTER TABLE `branches`
   ADD CONSTRAINT `branches_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `departments`
---
-ALTER TABLE `departments`
-  ADD CONSTRAINT `departments_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `departments_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `notifications`
@@ -865,17 +895,24 @@ ALTER TABLE `sites`
   ADD CONSTRAINT `sites_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL;
 
 --
+-- Constraints for table `departments`
+--
+ALTER TABLE `departments`
+  ADD CONSTRAINT `departments_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `departments_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `users`
 --
 ALTER TABLE `users`
   ADD CONSTRAINT `fk_assigned_admin` FOREIGN KEY (`assigned_admin_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_users_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`),
-  ADD CONSTRAINT `fk_users_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_users_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
   ADD CONSTRAINT `fk_users_createdby` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
-  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
-  ADD CONSTRAINT `users_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`);
+  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `users_ibfk_2` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
+  ADD CONSTRAINT `users_ibfk_3` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`);
 
 --
 -- Constraints for table `user_sites`
@@ -883,6 +920,12 @@ ALTER TABLE `users`
 ALTER TABLE `user_sites`
   ADD CONSTRAINT `user_sites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `user_sites_ibfk_2` FOREIGN KEY (`site_id`) REFERENCES `sites` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_agenda`
+--
+ALTER TABLE `user_agenda`
+  ADD CONSTRAINT `user_agenda_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

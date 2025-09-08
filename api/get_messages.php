@@ -25,8 +25,7 @@ try {
 
     if (!$row || !$row['assigned_admin_id']) {
         echo json_encode([
-            'success' => false,
-            'message' => 'No tienes un administrador asignado.',
+            'success' => true,
             'messages' => []
         ]);
         ob_end_flush();

@@ -657,7 +657,8 @@ error_reporting(E_ALL);
                     document.getElementById('role').value = user.role;
                     document.getElementById('is_active').checked = user.is_active;
                     loadCompanies(user.company_id);
-                    loadBranches(user.company_id, user.branch_id, user.department_id);
+                    loadDepartments(user.department_id);
+                    loadBranches(user.company_id, user.branch_id);
                     setTimeout(() => loadSitesForUser(user.id), 300);
 
                     if (CURRENT_USER_ROLE === 'admin') {
@@ -752,65 +753,39 @@ error_reporting(E_ALL);
             }
         }
 
-        document.getElementById('company_id').addEventListener('change', async function() {
-            const companyId = this.value;
-            const branchSelect = document.getElementById('branch_id');
-            if (companyId) {
-                branchSelect.innerHTML = '<option value="">Cargando...</option>';
-                await loadBranches(companyId);
-            } else {
-                branchSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
-            }
-        });
+        const companySelect = document.getElementById('company_id');
+        if (companySelect) {
+            companySelect.addEventListener('change', async function() {
+                const companyId = this.value;
+                const branchSelect = document.getElementById('branch_id');
+                if (branchSelect) { // Comprobación de seguridad
+                    if (companyId) {
+                        branchSelect.innerHTML = '<option value="">Cargando...</option>';
+                        await loadBranches(companyId);
+                    } else {
+                        branchSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
+                    }
+                }
+            });
+        }
 
-        async function loadBranches(companyId, selectedId = null, departmentId = null) {
+        async function loadBranches(companyId, selectedId = null) {
             const branchSelect = document.getElementById('branch_id');
-            const departmentSelect = document.getElementById('department_id');
-
+            if (!branchSelect) return;
             try {
                 const result = await apiCall(`api/get_branches.php?company_id=${companyId}`);
                 if (result.success) {
                     branchSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
-                    departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>'; // Reset departments
                     result.data.forEach(branch => {
                         const option = document.createElement('option');
                         option.value = branch.id;
                         option.textContent = `${branch.name} (${branch.province})`;
-                        if (selectedId && branch.id == selectedId) {
-                            option.selected = true;
-                            loadDepartmentsByBranch(selectedId, departmentId); // Load departments for the selected branch
-                        }
+                        if (selectedId && branch.id == selectedId) option.selected = true;
                         branchSelect.appendChild(option);
                     });
                 }
             } catch (error) {
                 branchSelect.innerHTML = '<option value="">Error</option>';
-                departmentSelect.innerHTML = '<option value="">Error</option>';
-            }
-        }
-
-        document.getElementById('branch_id').addEventListener('change', function() {
-            const branchId = this.value;
-            loadDepartmentsByBranch(branchId);
-        });
-
-        async function loadDepartmentsByBranch(branchId, selectedId = null) {
-            const departmentSelect = document.getElementById('department_id');
-            if (!branchId) {
-                departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>';
-                return;
-            }
-            departmentSelect.innerHTML = '<option value="">Cargando...</option>';
-            const result = await apiCall(`api/get_departments.php?branch_id=${branchId}`);
-            if (result.success) {
-                departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>';
-                result.data.forEach(dep => {
-                    const option = document.createElement('option');
-                    option.value = dep.id;
-                    option.textContent = dep.name;
-                    if (selectedId && dep.id == selectedId) option.selected = true;
-                    departmentSelect.appendChild(option);
-                });
             }
         }
 
@@ -1067,6 +1042,18 @@ error_reporting(E_ALL);
             }
         }
 
+        const branchCountrySelect = document.getElementById('branch-country-id');
+        if (branchCountrySelect) {
+            branchCountrySelect.addEventListener('change', function() {
+                const countryId = this.value;
+                if (countryId) {
+                    loadProvinces(countryId);
+                } else {
+                    document.getElementById('branch-province').innerHTML = '<option value="">Seleccionar provincia</option>';
+                }
+            });
+        }
+
         // --- DEPARTAMENTOS ---
         const departmentsTableBody = document.querySelector('#departments-table-body');
         const departmentForm = document.getElementById('department-form');
@@ -1215,15 +1202,6 @@ error_reporting(E_ALL);
                 selectElement.innerHTML = '<option value="">Error</option>';
             }
         }
-
-        document.getElementById('branch-country-id').addEventListener('change', function() {
-            const countryId = this.value;
-            if (countryId) {
-                loadProvinces(countryId);
-            } else {
-                document.getElementById('branch-province').innerHTML = '<option value="">Seleccionar provincia</option>';
-            }
-        });
 
         // --- SITIOS ---
         const sitesTableBody = document.querySelector('#sites-table-body');

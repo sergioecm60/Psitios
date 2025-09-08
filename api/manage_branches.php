@@ -1,4 +1,9 @@
 <?php
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 // ===============================
 // api/manage_branches.php
 // ===============================
@@ -86,4 +91,9 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error interno del servidor']);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;
 ?>

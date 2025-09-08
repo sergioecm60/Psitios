@@ -4,6 +4,11 @@
  * Permite al administrador eliminar un mensaje.
  */
 
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 require_once '../bootstrap.php';
 require_auth('admin');
 
@@ -54,3 +59,8 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error']);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;

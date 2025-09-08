@@ -55,13 +55,22 @@ try {
 
                 echo json_encode(['success' => true, 'data' => $users]);
             } elseif ($action === 'get' && $id) {
-                $stmt = $pdo->prepare("
+                $user_role = $_SESSION['user_role'] ?? 'user';
+                $sql = "
                     SELECT 
                         id, username, role, is_active, company_id, branch_id, department_id
                     FROM users 
-                    WHERE id = ?
-                ");
-                $stmt->execute([$id]);
+                    WHERE id = ?";
+                $params = [$id];
+
+                // ✅ MEJORA DE SEGURIDAD: Un admin solo puede ver usuarios de su departamento.
+                if ($user_role === 'admin' && !empty($_SESSION['department_id'])) {
+                    $sql .= " AND department_id = ?";
+                    $params[] = $_SESSION['department_id'];
+                }
+
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if (!$user) {
                     http_response_code(404);
@@ -110,7 +119,7 @@ try {
             $assigned_sites = $input['assigned_sites'] ?? [];
             $current_user_role = $_SESSION['user_role'];
 
-            // Un admin solo puede crear usuarios en su propia empresa/sucursal
+            // Un admin solo puede crear usuarios en su propio departamento
             if ($current_user_role === 'admin') {
                 $company_id = $_SESSION['company_id'];
                 $branch_id = $_SESSION['branch_id'];
@@ -175,6 +184,12 @@ try {
 
                 $sql .= " WHERE id = ?";
                 $params[] = $id;
+
+                // ✅ MEJORA DE SEGURIDAD: Un admin solo puede editar usuarios de su departamento.
+                if ($current_user_role === 'admin' && !empty($_SESSION['department_id'])) {
+                    $sql .= " AND department_id = ?";
+                    $params[] = $_SESSION['department_id'];
+                }
 
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);

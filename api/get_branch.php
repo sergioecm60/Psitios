@@ -1,5 +1,10 @@
 
 <?php
+if (ob_get_level()) {
+    ob_end_clean();
+}
+ob_start();
+
 // ===============================
 // api/get_branch.php
 // ===============================
@@ -37,4 +42,9 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error interno']);
 }
+
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;
 ?>
