@@ -11,7 +11,7 @@ if (ob_get_level()) {
 ob_start();
 
 require_once '../bootstrap.php';
-require_auth('user'); // Solo usuarios autenticados
+require_auth(); // Cualquier usuario autenticado puede ver sus propios sitios
 
 header('Content-Type: application/json');
 
@@ -20,17 +20,10 @@ try {
     $user_id = $_SESSION['user_id'];
 
     $stmt = $pdo->prepare("
-        SELECT 
-            id,
-            name,
-            url,
-            username,
-            password_encrypted,
-            notes,
-            created_at
+        SELECT id, name, url, username, password_encrypted IS NOT NULL as has_password, notes 
         FROM user_sites 
         WHERE user_id = ?
-        ORDER BY name
+        ORDER BY name ASC
     ");
     $stmt->execute([$user_id]);
     $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -40,7 +33,7 @@ try {
 } catch (Exception $e) {
     error_log("Error en get_user_sites_personal.php: " . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error interno']);
+    echo json_encode(['success' => false, 'message' => 'Error al cargar tus sitios personales.']);
 }
 
 if (ob_get_level()) {
