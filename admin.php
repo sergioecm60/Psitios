@@ -80,6 +80,7 @@ error_reporting(E_ALL);
             <?php if ($user_role === 'superadmin'): ?>
             <button class="tab-link" data-tab="companies-tab">🏢 Empresas</button>
             <button class="tab-link" data-tab="branches-tab">📍 Sucursales</button>
+            <button class="tab-link" data-tab="departments-tab">🏛️ Departamentos</button>
             <?php endif; ?>
             <button class="tab-link" data-tab="sites-tab">Sitios</button>
             <button class="tab-link" data-tab="messages-tab">💬 Mensajes</button>
@@ -99,6 +100,7 @@ error_reporting(E_ALL);
                             <th>Empresa</th>
                             <th>Sucursal</th>
                             <th>Provincia</th>
+                            <th>Departamento</th>
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
@@ -143,6 +145,25 @@ error_reporting(E_ALL);
                         </tr>
                     </thead>
                     <tbody id="branches-table-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pestaña de Departamentos -->
+        <div id="departments-tab" class="tab-content">
+            <h2>🏛️ Gestión de Departamentos</h2>
+            <button class="btn btn-primary" id="add-department-btn">+ Agregar Departamento</button>
+            <div class="table-wrapper">
+                <table id="departments-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Empresa</th>
+                            <th>Sucursal</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="departments-table-body"></tbody>
                 </table>
             </div>
         </div>
@@ -247,6 +268,12 @@ error_reporting(E_ALL);
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="department_id">Departamento</label>
+                    <select id="department_id" name="department_id" required>
+                        <option value="">Seleccionar departamento</option>
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Sitios Asignados</label>
                     <div id="sites-container"></div>
                 </div>
@@ -315,6 +342,40 @@ error_reporting(E_ALL);
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
                     <button type="button" class="btn btn-secondary" onclick="closeModal('branch-modal')">Cancelar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Departamento -->
+    <div id="department-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="department-modal-title">Agregar Departamento</h2>
+                <span class="close-btn" data-modal-id="department-modal">&times;</span>
+            </div>
+            <form id="department-form">
+                <input type="hidden" id="department-id" name="id">
+                <input type="hidden" id="department-action" name="action">
+                <div class="form-group">
+                    <label for="department-name">Nombre del Departamento</label>
+                    <input type="text" id="department-name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="department-company-id">Empresa</label>
+                    <select id="department-company-id" name="company_id" required>
+                        <option value="">Seleccionar empresa</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="department-branch-id">Sucursal</label>
+                    <select id="department-branch-id" name="branch_id" required>
+                        <option value="">Seleccionar sucursal</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('department-modal')">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -390,6 +451,7 @@ error_reporting(E_ALL);
     const CURRENT_USER_ROLE = '<?php echo $_SESSION['user_role']; ?>';
     const CURRENT_USER_COMPANY_ID = '<?php echo $_SESSION['company_id'] ?? ''; ?>';
     const CURRENT_USER_BRANCH_ID = '<?php echo $_SESSION['branch_id'] ?? ''; ?>';
+    const CURRENT_USER_DEPARTMENT_ID = '<?php echo $_SESSION['department_id'] ?? ''; ?>';
 
     // Se mueve fuera para que sea accesible globalmente por los atributos onclick=""
     function closeModal(modalId) {
@@ -522,12 +584,19 @@ error_reporting(E_ALL);
             }
             users.forEach(user => {
                 const tr = document.createElement('tr');
+
+                const companyName = user.company_name || (user.role === 'superadmin' ? 'Global' : 'N/A');
+                const branchName = user.branch_name || (user.role === 'superadmin' ? 'Global' : 'N/A');
+                const province = user.province || (user.role === 'superadmin' ? 'Global' : 'N/A');
+                const departmentName = user.department_name || (user.role === 'superadmin' ? 'Global' : 'N/A');
+
                 tr.innerHTML = `
                     <td>${escapeHtml(user.username)}</td>
                     <td>${escapeHtml(user.role)}</td>
-                    <td>${escapeHtml(user.company_name || '-')}</td>
-                    <td>${escapeHtml(user.branch_name || '-')}</td>
-                    <td>${escapeHtml(user.province || '-')}</td>
+                    <td>${escapeHtml(companyName)}</td>
+                    <td>${escapeHtml(branchName)}</td>
+                    <td>${escapeHtml(province)}</td>
+                    <td>${escapeHtml(departmentName)}</td>
                     <td>
                         <span class="status-toggle ${user.is_active ? 'active' : 'inactive'}">
                             ${user.is_active ? 'Activo' : 'Inactivo'}
@@ -549,6 +618,7 @@ error_reporting(E_ALL);
             document.getElementById('user-modal-title').textContent = 'Agregar Usuario';
             document.getElementById('is_active').checked = true;
             loadCompanies();
+            loadDepartments();
             loadSitesForUser();
 
             if (CURRENT_USER_ROLE === 'admin') {
@@ -556,6 +626,8 @@ error_reporting(E_ALL);
                 document.getElementById('branch_id').value = CURRENT_USER_BRANCH_ID;
                 document.getElementById('company_id').disabled = true;
                 document.getElementById('branch_id').disabled = true;
+                document.getElementById('department_id').value = CURRENT_USER_DEPARTMENT_ID;
+                document.getElementById('department_id').disabled = true;
             }
             openModal('user-modal');
         });
@@ -585,12 +657,13 @@ error_reporting(E_ALL);
                     document.getElementById('role').value = user.role;
                     document.getElementById('is_active').checked = user.is_active;
                     loadCompanies(user.company_id);
-                    loadBranches(user.company_id, user.branch_id);
+                    loadBranches(user.company_id, user.branch_id, user.department_id);
                     setTimeout(() => loadSitesForUser(user.id), 300);
 
                     if (CURRENT_USER_ROLE === 'admin') {
                         document.getElementById('company_id').disabled = true;
                         document.getElementById('branch_id').disabled = true;
+                        document.getElementById('department_id').disabled = true;
                     }
 
                     openModal('user-modal');
@@ -618,6 +691,7 @@ error_reporting(E_ALL);
                 is_active: document.getElementById('is_active').checked,
                 company_id: document.getElementById('company_id').value || null,
                 branch_id: document.getElementById('branch_id').value || null,
+                department_id: document.getElementById('department_id').value || null,
                 assigned_sites: Array.from(document.querySelectorAll('.site-checkbox:checked'))
                     .map(cb => cb.value)
             };
@@ -655,6 +729,29 @@ error_reporting(E_ALL);
             }
         }
 
+        async function loadDepartments(selectedId = null) {
+            const select = document.getElementById('department_id');
+            if (!select) return;
+            select.innerHTML = '<option value="">Cargando...</option>';
+            try {
+                const result = await apiCall('api/get_departments.php');
+                if (result.success) {
+                    select.innerHTML = '<option value="">Seleccionar departamento</option>';
+                    result.data.forEach(dep => {
+                        const option = document.createElement('option');
+                        option.value = dep.id;
+                        option.textContent = dep.name;
+                        if (selectedId && dep.id == selectedId) option.selected = true;
+                        select.appendChild(option);
+                    });
+                } else {
+                    select.innerHTML = '<option value="">Error al cargar</option>';
+                }
+            } catch (error) {
+                select.innerHTML = '<option value="">Error</option>';
+            }
+        }
+
         document.getElementById('company_id').addEventListener('change', async function() {
             const companyId = this.value;
             const branchSelect = document.getElementById('branch_id');
@@ -666,22 +763,54 @@ error_reporting(E_ALL);
             }
         });
 
-        async function loadBranches(companyId, selectedId = null) {
+        async function loadBranches(companyId, selectedId = null, departmentId = null) {
             const branchSelect = document.getElementById('branch_id');
+            const departmentSelect = document.getElementById('department_id');
+
             try {
                 const result = await apiCall(`api/get_branches.php?company_id=${companyId}`);
                 if (result.success) {
                     branchSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
+                    departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>'; // Reset departments
                     result.data.forEach(branch => {
                         const option = document.createElement('option');
                         option.value = branch.id;
                         option.textContent = `${branch.name} (${branch.province})`;
-                        if (selectedId && branch.id == selectedId) option.selected = true;
+                        if (selectedId && branch.id == selectedId) {
+                            option.selected = true;
+                            loadDepartmentsByBranch(selectedId, departmentId); // Load departments for the selected branch
+                        }
                         branchSelect.appendChild(option);
                     });
                 }
             } catch (error) {
                 branchSelect.innerHTML = '<option value="">Error</option>';
+                departmentSelect.innerHTML = '<option value="">Error</option>';
+            }
+        }
+
+        document.getElementById('branch_id').addEventListener('change', function() {
+            const branchId = this.value;
+            loadDepartmentsByBranch(branchId);
+        });
+
+        async function loadDepartmentsByBranch(branchId, selectedId = null) {
+            const departmentSelect = document.getElementById('department_id');
+            if (!branchId) {
+                departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>';
+                return;
+            }
+            departmentSelect.innerHTML = '<option value="">Cargando...</option>';
+            const result = await apiCall(`api/get_departments.php?branch_id=${branchId}`);
+            if (result.success) {
+                departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>';
+                result.data.forEach(dep => {
+                    const option = document.createElement('option');
+                    option.value = dep.id;
+                    option.textContent = dep.name;
+                    if (selectedId && dep.id == selectedId) option.selected = true;
+                    departmentSelect.appendChild(option);
+                });
             }
         }
 
@@ -938,6 +1067,155 @@ error_reporting(E_ALL);
             }
         }
 
+        // --- DEPARTAMENTOS ---
+        const departmentsTableBody = document.querySelector('#departments-table-body');
+        const departmentForm = document.getElementById('department-form');
+
+        async function fetchDepartments() {
+            if (!departmentsTableBody) return;
+            const result = await apiCall('api/get_departments.php');
+            if (result && result.success) {
+                renderDepartmentsTable(result.data);
+            }
+        }
+
+        function renderDepartmentsTable(departments) {
+            if (!departmentsTableBody) return;
+            departmentsTableBody.innerHTML = '';
+            if (departments.length === 0) {
+                departmentsTableBody.innerHTML = '<tr><td colspan="4">No hay departamentos para mostrar.</td></tr>';
+                return;
+            }
+            departments.forEach(dept => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${escapeHtml(dept.name)}</td>
+                    <td>${escapeHtml(dept.company_name || 'N/A')}</td>
+                    <td>${escapeHtml(dept.branch_name || 'N/A')}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-secondary edit-department-btn" data-id="${dept.id}">Editar</button>
+                        <button class="btn btn-sm btn-danger delete-department-btn" data-id="${dept.id}">Eliminar</button>
+                    </td>
+                `;
+                departmentsTableBody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('add-department-btn')?.addEventListener('click', () => {
+            departmentForm.reset();
+            document.getElementById('department-id').value = '';
+            document.getElementById('department-action').value = 'add';
+            document.getElementById('department-modal-title').textContent = 'Agregar Departamento';
+            loadDepartmentCompanies();
+            document.getElementById('department-branch-id').innerHTML = '<option value="">Seleccionar sucursal</option>';
+            openModal('department-modal');
+        });
+
+        departmentsTableBody?.addEventListener('click', async (e) => {
+            const editBtn = e.target.closest('.edit-department-btn');
+            if (editBtn) {
+                const id = editBtn.dataset.id;
+                const result = await apiCall(`api/manage_departments.php?id=${id}`);
+                if (result && result.success) {
+                    const dept = result.data;
+                    departmentForm.reset();
+                    document.getElementById('department-id').value = dept.id;
+                    document.getElementById('department-action').value = 'edit';
+                    document.getElementById('department-modal-title').textContent = 'Editar Departamento';
+                    document.getElementById('department-name').value = dept.name;
+                    await loadDepartmentCompanies(dept.company_id);
+                    await loadDepartmentBranches(dept.company_id, dept.branch_id);
+                    openModal('department-modal');
+                }
+            }
+
+            const deleteBtn = e.target.closest('.delete-department-btn');
+            if (deleteBtn) {
+                if (!confirm('¿Eliminar este departamento?')) return;
+                const id = deleteBtn.dataset.id;
+                const result = await apiCall('api/manage_departments.php', 'POST', { action: 'delete', id: id });
+                if (result && result.success) {
+                    fetchDepartments();
+                }
+            }
+        });
+
+        departmentForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(departmentForm);
+            const data = Object.fromEntries(formData.entries());
+            data.id = parseInt(data.id) || null;
+            const result = await apiCall('api/manage_departments.php', 'POST', data);
+            if (result && result.success) {
+                closeModal('department-modal');
+                fetchDepartments();
+                loadDepartments(); // Recargar lista de departamentos en modal de usuario
+            }
+        });
+
+        async function loadDepartmentCompanies(selectedId = null) {
+            const select = document.getElementById('department-company-id');
+            if (!select) return;
+            await loadCompaniesGeneric(select, selectedId);
+        }
+
+        async function loadDepartmentBranches(companyId, selectedId = null) {
+            const select = document.getElementById('department-branch-id');
+            if (!select) return;
+            await loadBranchesGeneric(select, companyId, selectedId);
+        }
+
+        document.getElementById('department-company-id')?.addEventListener('change', function() {
+            const companyId = this.value;
+            const branchSelect = document.getElementById('department-branch-id');
+            if (companyId) {
+                branchSelect.innerHTML = '<option value="">Cargando...</option>';
+                loadDepartmentBranches(companyId);
+            } else {
+                branchSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
+            }
+        });
+
+        async function loadCompaniesGeneric(selectElement, selectedId = null) {
+            if (!selectElement) return;
+            selectElement.innerHTML = '<option value="">Cargando...</option>';
+            const result = await apiCall('api/get_companies.php');
+            if (result && result.success) {
+                selectElement.innerHTML = '<option value="">Seleccionar empresa</option>';
+                result.data.forEach(c => {
+                    const option = document.createElement('option');
+                    option.value = c.id;
+                    option.textContent = c.name;
+                    if (selectedId && c.id == selectedId) option.selected = true;
+                    selectElement.appendChild(option);
+                });
+            } else {
+                selectElement.innerHTML = '<option value="">Error</option>';
+            }
+        }
+
+        async function loadBranchesGeneric(selectElement, companyId, selectedId = null) {
+            if (!selectElement) return;
+            if (!companyId) {
+                selectElement.innerHTML = '<option value="">Seleccionar sucursal</option>';
+                return;
+            }
+            selectElement.innerHTML = '<option value="">Cargando...</option>';
+            const result = await apiCall(`api/get_branches.php?company_id=${companyId}`);
+            if (result && result.success) {
+                selectElement.innerHTML = '<option value="">Seleccionar sucursal</option>';
+                result.data.forEach(b => {
+                    const option = document.createElement('option');
+                    option.value = b.id;
+                    option.textContent = b.name;
+                    if (selectedId && b.id == selectedId) option.selected = true;
+                    selectElement.appendChild(option);
+                });
+            } else {
+                selectElement.innerHTML = '<option value="">Error</option>';
+            }
+        }
+
         document.getElementById('branch-country-id').addEventListener('change', function() {
             const countryId = this.value;
             if (countryId) {
@@ -1101,6 +1379,7 @@ error_reporting(E_ALL);
         fetchSites();
         fetchCompanies();
         fetchBranches();
+        fetchDepartments();
         // --- AUDITORÍA ---
     const auditTableBody = document.getElementById('audit-table-body');
 

@@ -50,7 +50,8 @@ try {
             password_hash, 
             role, 
             company_id, 
-            branch_id 
+            branch_id,
+            department_id
         FROM users 
         WHERE username = ? AND is_active = 1
     ");
@@ -64,6 +65,7 @@ try {
         $_SESSION['user_role'] = $user['role'];
         $_SESSION['company_id'] = $user['company_id'];
         $_SESSION['branch_id'] = $user['branch_id'];
+        $_SESSION['department_id'] = $user['department_id'];
         $_SESSION['username'] = $user['username'];
 
         // Decidir redirección

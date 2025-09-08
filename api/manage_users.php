@@ -31,16 +31,17 @@ try {
             if ($action === 'list') {
                 $user_role = $_SESSION['user_role'] ?? 'user';
                 $base_query = "
-                    SELECT u.id, u.username, u.role, u.is_active, u.created_at,
-                           c.name as company_name, b.name as branch_name, b.province
+                    SELECT u.id, u.username, u.role, u.is_active, u.created_at, u.department_id,
+                           c.name as company_name, b.name as branch_name, b.province, d.name as department_name
                     FROM users u
                     LEFT JOIN companies c ON u.company_id = c.id
-                    LEFT JOIN branches b ON u.branch_id = b.id";
+                    LEFT JOIN branches b ON u.branch_id = b.id
+                    LEFT JOIN departments d ON u.department_id = d.id";
 
-                if ($user_role === 'admin') {
-                    // Admin solo ve usuarios que él creó en su sucursal
-                    $stmt = $pdo->prepare($base_query . " WHERE u.created_by = ? ORDER BY u.username ASC");
-                    $stmt->execute([$_SESSION['user_id']]);
+                if ($user_role === 'admin' && !empty($_SESSION['department_id'])) {
+                    // Admin solo ve usuarios de su departamento
+                    $stmt = $pdo->prepare($base_query . " WHERE u.department_id = ? ORDER BY u.username ASC");
+                    $stmt->execute([$_SESSION['department_id']]);
                 } else { // SuperAdmin ve todo
                     $stmt = $pdo->query($base_query . " ORDER BY u.username ASC");
                 }
@@ -56,7 +57,7 @@ try {
             } elseif ($action === 'get' && $id) {
                 $stmt = $pdo->prepare("
                     SELECT 
-                        id, username, role, is_active, company_id, branch_id
+                        id, username, role, is_active, company_id, branch_id, department_id
                     FROM users 
                     WHERE id = ?
                 ");
@@ -72,6 +73,7 @@ try {
                 $user['id'] = (int)$user['id'];
                 $user['company_id'] = $user['company_id'] ? (int)$user['company_id'] : null;
                 $user['branch_id'] = $user['branch_id'] ? (int)$user['branch_id'] : null;
+                $user['department_id'] = $user['department_id'] ? (int)$user['department_id'] : null;
                 echo json_encode(['success' => true, 'data' => $user]);
             } elseif ($action === 'get_assigned_sites' && $id) {
                 $stmt = $pdo->prepare("
@@ -103,6 +105,8 @@ try {
             $is_active = !empty($input['is_active']) ? 1 : 0;
             $company_id = $input['company_id'] ?? null;
             $branch_id = $input['branch_id'] ?? null;
+            // ✅ Sanitize department_id to ensure it's an integer or null, preventing errors with empty strings.
+            $department_id = filter_var($input['department_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
             $assigned_sites = $input['assigned_sites'] ?? [];
             $current_user_role = $_SESSION['user_role'];
 
@@ -110,6 +114,7 @@ try {
             if ($current_user_role === 'admin') {
                 $company_id = $_SESSION['company_id'];
                 $branch_id = $_SESSION['branch_id'];
+                $department_id = $_SESSION['department_id'];
                 $role = 'user'; // Un admin solo puede crear usuarios, no otros admins.
             }
  
@@ -159,8 +164,8 @@ try {
                     exit;
                 }
 
-                $sql = "UPDATE users SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?";
-                $params = [$username, $role, $is_active, $company_id, $branch_id];
+                $sql = "UPDATE users SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?, department_id = ?";
+                $params = [$username, $role, $is_active, $company_id, $branch_id, $department_id];
 
                 if (!empty($password)) {
                     $password_hash = password_hash($password, PASSWORD_DEFAULT);
@@ -199,10 +204,10 @@ try {
 
                 $created_by = $_SESSION['user_id'];
                 $stmt = $pdo->prepare("
-                    INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id, department_id, created_by)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$username, $password_hash, $role, $is_active, $company_id, $branch_id, $created_by]);
+                $stmt->execute([$username, $password_hash, $role, $is_active, $company_id, $branch_id, $department_id, $created_by]);
                 $newId = $pdo->lastInsertId();
 
                 // Asignar sitios

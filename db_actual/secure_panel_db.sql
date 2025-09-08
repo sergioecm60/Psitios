@@ -90,6 +90,27 @@ INSERT INTO `companies` (`id`, `name`, `created_at`) VALUES
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `departments`
+--
+
+CREATE TABLE `departments` (
+  `id` int NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `company_id` int DEFAULT NULL,
+  `branch_id` int DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+--
+-- Dumping data for table `departments`
+--
+
+INSERT INTO `departments` (`id`, `name`, `company_id`, `branch_id`, `created_at`) VALUES
+(1, 'Administración', 1, 1, '2025-09-05 15:00:00');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `countries`
 --
 
@@ -536,7 +557,8 @@ CREATE TABLE `sites` (
   `iv` blob COMMENT 'Vector de inicialización para la encriptación',
   `password_needs_update` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Flag para notificar si la pass expiró',
   `notes` text COLLATE utf8mb4_unicode_ci,
-  `created_by` int NOT NULL DEFAULT '1'
+  `created_by` int NOT NULL DEFAULT '1',
+  `department_id` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -563,6 +585,7 @@ CREATE TABLE `users` (
   `branch_id` int DEFAULT NULL,
   `assigned_admin_id` int DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `department_id` int DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `created_by` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -571,11 +594,11 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `company_id`, `branch_id`, `assigned_admin_id`, `is_active`, `created_at`, `created_by`) VALUES
-(1, 'admin', '$2y$10$NlguZUw9cO1.weM9Sw2sL.1B61BTQNhv/5do/Z66SLZOR8Zo7OdIy', 'superadmin', 1, 1, NULL, 1, '2025-08-27 19:37:58', NULL),
-(7, 'BrianF', '$2y$10$c1TokUq/pEiBgwV07Gpl0ekWFJu6gcjhurDZMBuaWiGrsH30CzMcq', 'admin', NULL, NULL, NULL, 1, '2025-08-29 14:23:03', NULL),
-(8, 'juanp', '$2y$10$XTEQVVrGcECeUU2/5xU0ceTTOqhyeo2GifgIHDyMUprTItE7HgSQu', 'user', 2, 3, 1, 1, '2025-08-29 20:10:43', NULL),
-(9, 'pepea', '$2y$10$3NAssuFIKCg1WGSTurI1BOR8tsp3dQ92tOQ8O/QL6BOV0sUmzN/BK', 'user', 1, 1, 1, 1, '2025-09-02 16:21:49', NULL);
+INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `company_id`, `branch_id`, `assigned_admin_id`, `is_active`, `department_id`, `created_at`, `created_by`) VALUES
+(1, 'admin', '$2y$10$NlguZUw9cO1.weM9Sw2sL.1B61BTQNhv/5do/Z66SLZOR8Zo7OdIy', 'superadmin', NULL, NULL, NULL, 1, NULL, '2025-08-27 19:37:58', NULL),
+(7, 'BrianF', '$2y$10$c1TokUq/pEiBgwV07Gpl0ekWFJu6gcjhurDZMBuaWiGrsH30CzMcq', 'admin', 1, 1, NULL, 1, 1, '2025-08-29 14:23:03', 1),
+(8, 'juanp', '$2y$10$XTEQVVrGcECeUU2/5xU0ceTTOqhyeo2GifgIHDyMUprTItE7HgSQu', 'user', 2, 3, 1, 1, NULL, '2025-08-29 20:10:43', 1),
+(9, 'pepea', '$2y$10$3NAssuFIKCg1WGSTurI1BOR8tsp3dQ92tOQ8O/QL6BOV0sUmzN/BK', 'user', 1, 1, 1, 1, 1, '2025-09-02 16:21:49', 7);
 
 -- --------------------------------------------------------
 
@@ -621,6 +644,15 @@ ALTER TABLE `companies`
 ALTER TABLE `countries`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `departments`
+--
+ALTER TABLE `departments`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_dept_in_branch` (`name`,`branch_id`),
+  ADD KEY `company_id` (`company_id`),
+  ADD KEY `branch_id` (`branch_id`);
 
 --
 -- Indexes for table `messages`
@@ -669,7 +701,8 @@ ALTER TABLE `shared_sites_assignments`
 --
 ALTER TABLE `sites`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `name` (`name`);
+  ADD UNIQUE KEY `name` (`name`),
+  ADD KEY `department_id` (`department_id`);
 
 --
 -- Indexes for table `users`
@@ -680,7 +713,8 @@ ALTER TABLE `users`
   ADD KEY `idx_created_by` (`created_by`),
   ADD KEY `fk_assigned_admin` (`assigned_admin_id`),
   ADD KEY `fk_users_company` (`company_id`),
-  ADD KEY `fk_users_branch` (`branch_id`);
+  ADD KEY `fk_users_branch` (`branch_id`),
+  ADD KEY `department_id` (`department_id`);
 
 --
 -- Indexes for table `user_sites`
@@ -717,6 +751,12 @@ ALTER TABLE `companies`
 --
 ALTER TABLE `countries`
   MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=171;
+
+--
+-- AUTO_INCREMENT for table `departments`
+--
+ALTER TABLE `departments`
+  MODIFY `id` int NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `messages`
@@ -784,6 +824,13 @@ ALTER TABLE `branches`
   ADD CONSTRAINT `branches_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `departments`
+--
+ALTER TABLE `departments`
+  ADD CONSTRAINT `departments_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `departments_ibfk_2` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `notifications`
 --
 ALTER TABLE `notifications`
@@ -812,12 +859,19 @@ ALTER TABLE `shared_sites_assignments`
   ADD CONSTRAINT `shared_sites_assignments_ibfk_3` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`id`);
 
 --
+-- Constraints for table `sites`
+--
+ALTER TABLE `sites`
+  ADD CONSTRAINT `sites_ibfk_1` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL;
+
+--
 -- Constraints for table `users`
 --
 ALTER TABLE `users`
   ADD CONSTRAINT `fk_assigned_admin` FOREIGN KEY (`assigned_admin_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_created_by` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_users_branch` FOREIGN KEY (`branch_id`) REFERENCES `branches` (`id`),
+  ADD CONSTRAINT `fk_users_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_users_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
   ADD CONSTRAINT `fk_users_createdby` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`),
   ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`),
