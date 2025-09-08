@@ -16,7 +16,7 @@ try {
     $user_id = $_SESSION['user_id'];
 
     $stmt = $pdo->prepare("
-        SELECT svc.id as service_id, s.id as site_id, s.name, s.url, s.username, s.password_needs_update, s.notes
+        SELECT svc.id as service_id, s.id as site_id, s.name, s.url, s.username, s.password_needs_update, s.notes, s.password_encrypted IS NOT NULL as has_password
         FROM sites s
         JOIN services svc ON s.id = svc.site_id
         WHERE svc.user_id = ?

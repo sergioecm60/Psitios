@@ -45,8 +45,7 @@ class NotificationManager {
                 const button = event.target.closest('.mark-read-btn');
                 if (button) {
                     event.preventDefault();
-                    const notificationItem = button.closest('.notification-item');
-                    const notificationId = notificationItem ? notificationItem.dataset.id : null;
+                    const notificationId = button.dataset.id;
                     if (notificationId) {
                         this.markAsRead(parseInt(notificationId, 10));
                     }
@@ -56,8 +55,7 @@ class NotificationManager {
                 const deleteBtn = event.target.closest('.delete-notification-btn');
                 if (deleteBtn) {
                     event.preventDefault();
-                    const notificationItem = deleteBtn.closest('.notification-item');
-                    const notificationId = notificationItem ? notificationItem.dataset.id : null;
+                    const notificationId = deleteBtn.dataset.id;
                     if (notificationId) {
                         this.deleteNotification(parseInt(notificationId, 10));
                     }
@@ -67,8 +65,7 @@ class NotificationManager {
                 const resolveBtn = event.target.closest('.resolve-btn');
                 if (resolveBtn) {
                     event.preventDefault();
-                    const notificationItem = resolveBtn.closest('.notification-item');
-                    const notificationId = notificationItem ? notificationItem.dataset.id : null;
+                    const notificationId = resolveBtn.dataset.id;
                     if (notificationId && confirm('¿Marcar esta notificación como resuelta?')) {
                         this.resolveNotification(parseInt(notificationId, 10));
                     }
@@ -183,11 +180,11 @@ class NotificationManager {
                         ${notification.site_name ? `<span class="notification-site">🌐 ${this.escapeHtml(notification.site_name)}</span>` : ''}
                         ${isResolved 
                             ? `<span class="notification-resolved">✅ Resuelto: ${this.formatTime(notification.resolved_at)}</span>` 
-                            : `<button class="resolve-btn" style="background: #28a745; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">✅ Resuelto</button>`
+                            : `<button class="resolve-btn" data-id="${notification.id}" style="background: #28a745; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">✅ Resuelto</button>`
                         }
                     </div>
-                    ${!notification.is_read && !isResolved ? '<button class="mark-read-btn">✓ Marcar como leída</button>' : ''}
-                    <button class="delete-notification-btn" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">🗑️</button>
+                    ${!notification.is_read && !isResolved ? `<button class="mark-read-btn" data-id="${notification.id}">✓ Marcar como leída</button>` : ''}
+                    <button class="delete-notification-btn" data-id="${notification.id}" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">🗑️</button>
                 </div>
             `;
         }).join('');

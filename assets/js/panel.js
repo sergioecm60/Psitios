@@ -42,16 +42,29 @@ document.addEventListener('DOMContentLoaded', function() {
     const tabs = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     
+    function loadTabContent(tabId) {
+        switch (tabId) {
+            case 'admin-sites-tab':
+                fetchAdminSites();
+                break;
+            case 'user-sites-tab':
+                fetchUserSites();
+                break;
+            case 'agenda-tab':
+                loadAgenda();
+                break;
+        }
+    }
+
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
             tabs.forEach(t => t.classList.remove('active'));
             tabContents.forEach(c => c.classList.remove('active'));
             tab.classList.add('active');
-            const activeTabContent = document.getElementById(tab.dataset.tab);
+            const activeTabId = tab.dataset.tab;
+            const activeTabContent = document.getElementById(activeTabId);
             if (activeTabContent) activeTabContent.classList.add('active');
-            
-            // Cargar contenido de la pestaña de agenda al hacer clic
-            if (tab.dataset.tab === 'agenda-tab') loadAgenda();
+            loadTabContent(activeTabId);
         });
     });
 
@@ -214,20 +227,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 ${isAssigned && item.password_needs_update ? '<p class="notification">⚠️ Contraseña pendiente</p>' : ''}
                 ${item.url ? `<a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-launch">🌐 Acceder</a>` : ''}
                 <div class="credentials-area">
-                    ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isPersonal ? 'personal' : 'assigned'}">👁️ Ver</button>` : ''}
+                    ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isAssigned ? 'assigned' : 'personal'}">👁️ Ver</button>` : ''}
                     ${isAssigned ? `<button class="btn-notify-expired" data-id="${id}" ${item.password_needs_update ? 'disabled' : ''}>⏳ Notificar</button>` : ''}
                     ${isAssigned ? `<button class="btn-report-problem" data-site-id="${siteId}">🚨 Reportar</button>` : ''}
                     ${isPersonal ? `<button class="btn btn-sm btn-secondary btn-edit-site" data-id="${id}" data-type="personal">✏️ Editar</button>` : ''}
                     ${isPersonal ? `<button class="btn btn-sm btn-danger btn-delete-site" data-id="${id}" data-type="personal">🗑️ Eliminar</button>` : ''}
                 </div>
-                <div class="creds-display hidden" id="creds-${isPersonal ? 'p' : 'a'}-${id}"></div>
+                <div class="creds-display hidden" id="creds-${isAssigned ? 'a' : 'p'}-${id}"></div>
             </div>
         `;
     }
 
-    // Carga inicial de la primera pestaña
-    fetchAdminSites();
-    fetchUserSites();
+    // Carga inicial de la primera pestaña activa
+    const initialActiveTab = document.querySelector('.tab-link.active');
+    if (initialActiveTab) loadTabContent(initialActiveTab.dataset.tab);
 
     // --- MANEJO DE BOTONES DE SITIOS (VER, NOTIFICAR, REPORTAR) ---
     document.querySelector('.container').addEventListener('click', async (e) => {

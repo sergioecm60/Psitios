@@ -59,19 +59,21 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         </header>
 
         <nav class="tab-nav">
-            <button class="tab-link active" data-tab="sites-tab">Sitios</button>
+            <button class="tab-link active" data-tab="admin-sites-tab">Sitios Asignados</button>
+            <button class="tab-link" data-tab="user-sites-tab">Mis Sitios Personales</button>
             <button class="tab-link" data-tab="agenda-tab">📅 Mi Agenda</button>
         </nav>
 
-        <!-- Pestaña de Sitios (combinada) -->
-        <div id="sites-tab" class="tab-content active">
+        <!-- Pestaña de Sitios Asignados -->
+        <div id="admin-sites-tab" class="tab-content active">
             <h2>🌐 Sitios Asignados por el Administrador</h2>
             <div id="admin-sites-grid" class="services-grid">
                 <div class="loading">Cargando sitios...</div>
             </div>
-            
-            <hr class="content-divider">
+        </div>
 
+        <!-- Pestaña de Sitios Personales -->
+        <div id="user-sites-tab" class="tab-content">
             <h2>🔐 Mis Sitios Personales</h2>
             <button class="btn btn-primary" id="add-user-site-btn">+ Agregar Sitio Personal</button>
             <div id="user-sites-grid" class="services-grid"></div>

@@ -66,13 +66,21 @@ try {
     $decrypted_password = '';
     if (!empty($site_credentials['password_encrypted']) && !empty($site_credentials['iv'])) {
         $decrypted_password = decrypt_from_parts($site_credentials['password_encrypted'], $site_credentials['iv']);
+        
+        // ✅ Manejar un posible fallo en la desencriptación
+        if ($decrypted_password === null) {
+            error_log("Fallo de desencriptación para service_id: {$service_id}");
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Error al procesar las credenciales.']);
+            exit;
+        }
     }
 
     echo json_encode([
         'success' => true, 
         'data' => [
             'username' => $site_credentials['username'], 
-            'password' => $decrypted_password ?: 'No disponible'
+            'password' => $decrypted_password
         ]
     ]);
 
