@@ -132,8 +132,8 @@ try {
             $url = trim($input['url'] ?? '');
             $username = $input['username'] ?? null;
             $password = $input['password'] ?? null;
-            $needs_update = !empty($input['password_needs_update']) ? 1 : 0;
             $notes = $input['notes'] ?? null;
+            $needs_update = 0; // Por defecto, un sitio nuevo no requiere actualización.
 
             if ($action === 'delete') {
                 if (!$id) {
@@ -225,14 +225,16 @@ try {
                         exit;
                     }
 
-                    $sql_parts = ["name = ?", "url = ?", "username = ?", "password_needs_update = ?", "notes = ?"];
-                    $params = [$name, $url, $username, $needs_update, $notes];
+                    $sql_parts = ["name = ?", "url = ?", "username = ?", "notes = ?"];
+                    $params = [$name, $url, $username, $notes];
 
                     if ($encrypted_data) {
                         $sql_parts[] = "password_encrypted = ?";
                         $sql_parts[] = "iv = ?";
                         $params[] = $encrypted_data['ciphertext'];
                         $params[] = $encrypted_data['iv'];
+                        // ✅ Al cambiar la contraseña, se resetea el flag de actualización.
+                        $sql_parts[] = "password_needs_update = 0";
                     }
 
                     $sql = "UPDATE sites SET " . implode(', ', $sql_parts) . " WHERE id = ?";
@@ -246,6 +248,12 @@ try {
 
                     $stmt = $pdo->prepare($sql);
                     $stmt->execute($params);
+
+                    // ✅ Si se cambió la contraseña, también reseteamos el flag en todos los servicios asociados.
+                    if ($encrypted_data) {
+                        $stmt_services = $pdo->prepare("UPDATE services SET password_needs_update = 0 WHERE site_id = ?");
+                        $stmt_services->execute([$id]);
+                    }
 
                     if ($stmt->rowCount() > 0) {
                         echo json_encode(['success' => true, 'message' => 'Actualizado']);

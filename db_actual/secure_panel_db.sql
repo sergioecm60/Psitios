@@ -613,18 +613,23 @@ INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `company_id`, `b
 -- --------------------------------------------------------
 
 --
--- Table structure for table `user_agenda`
+-- Table structure for table `user_reminders`
 --
 
-CREATE TABLE `user_agenda` (
+CREATE TABLE `user_reminders` (
   `id` int NOT NULL,
   `user_id` int NOT NULL,
+  `type` enum('credential','note') NOT NULL,
   `title` varchar(255) NOT NULL,
   `username` varchar(255) DEFAULT NULL,
   `password_encrypted` text,
   `notes` text,
+  `reminder_datetime` datetime DEFAULT NULL,
+  `is_completed` tinyint(1) DEFAULT '0',
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+-- --------------------------------------------------------
 
 --
 -- Table structure for table `user_sites`
@@ -633,8 +638,13 @@ CREATE TABLE `user_agenda` (
 CREATE TABLE `user_sites` (
   `id` int NOT NULL,
   `user_id` int NOT NULL,
-  `site_id` int NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_spanish_ci;
+  `name` varchar(255) NOT NULL,
+  `url` varchar(512) DEFAULT NULL,
+  `username` varchar(255) DEFAULT NULL,
+  `password_encrypted` text,
+  `notes` text,
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 --
 -- Indexes for dumped tables
@@ -745,16 +755,7 @@ ALTER TABLE `users`
 --
 ALTER TABLE `user_sites`
   ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_user_site` (`user_id`,`site_id`),
-  ADD KEY `site_id` (`site_id`);
-
---
--- Indexes for table `user_agenda`
---
-ALTER TABLE `user_agenda`
-  ADD PRIMARY KEY (`id`),
   ADD KEY `user_id` (`user_id`);
-
 --
 -- AUTO_INCREMENT for dumped tables
 --
@@ -838,12 +839,6 @@ ALTER TABLE `user_sites`
   MODIFY `id` int NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `user_agenda`
---
-ALTER TABLE `user_agenda`
-  MODIFY `id` int NOT NULL AUTO_INCREMENT;
-
---
 -- Constraints for dumped tables
 --
 
@@ -918,13 +913,6 @@ ALTER TABLE `users`
 -- Constraints for table `user_sites`
 --
 ALTER TABLE `user_sites`
-  ADD CONSTRAINT `user_sites_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `user_sites_ibfk_2` FOREIGN KEY (`site_id`) REFERENCES `sites` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `user_agenda`
---
-ALTER TABLE `user_agenda`
   ADD CONSTRAINT `user_agenda_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 COMMIT;
 

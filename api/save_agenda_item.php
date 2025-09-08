@@ -12,8 +12,14 @@ $input = json_decode(file_get_contents('php://input'), true);
 
 $title = trim($input['title'] ?? '');
 $username = $input['username'] ?? null;
-$encryptedPass = $input['password'] ?? null;
+$password = $input['password'] ?? null; // Password comes in plaintext
 $notes = $input['notes'] ?? null;
+
+// ✅ Encrypt the password on the server
+$encryptedPass = null;
+if ($password) {
+    $encryptedPass = encrypt_data($password);
+}
 
 if (empty($title)) {
     http_response_code(400);

@@ -1,0 +1,131 @@
+/* Chat */
+#chat-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+}
+#chat-modal.active {
+    display: flex;
+}
+/* .modal-content se define en main.css para consistencia */
+#chat-messages {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 10px;
+    background: #f8f9fa;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+}
+#chat-form {
+    display: flex;
+    gap: 10px;
+}
+#chat-input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+}
+#chat-form button {
+    padding: 10px 15px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+}
+.chat-message {
+    position: relative;
+    margin: 8px 0;
+    padding: 6px 10px;
+    border-radius: 12px;
+    max-width: 80%;
+    line-height: 1.4;
+}
+.chat-message.sent {
+    background: #007bff;
+    color: white;
+    margin-left: auto;
+    text-align: right;
+}
+.chat-message.received {
+    background: #e9ecef;
+    color: #333;
+    margin-right: auto;
+}
+.delete-msg-btn {
+    position: absolute;
+    right: 0;
+    top: 5px;
+    background: none;
+    border: none;
+    color: #dc3545;
+    cursor: pointer;
+    font-size: 1.2rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.chat-message:hover .delete-msg-btn {
+    opacity: 1;
+}
+.creds-display {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+.creds-display p {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 4px 0;
+}
+.btn-copy {
+    margin-left: 10px;
+    padding: 2px 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    transition: background-color 0.2s, transform 0.2s;
+}
+.btn-copy:hover {
+    background-color: #5a6268;
+    transform: scale(1.05);
+}
+
+.notification {
+    background: #fff3cd;
+    color: #856404;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    margin: 5px 0;
+    border: 1px solid #ffeaa7;
+}
+
+.error {
+    color: #dc3545;
+    font-size: 0.9rem;
+    background: #f8d7da;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #f5c6cb;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-style: italic;
+}

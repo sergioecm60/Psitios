@@ -98,6 +98,67 @@ function decrypt_from_parts(string $ciphertext, string $iv): ?string
 }
 
 /**
+ * Cifra un texto plano y devuelve una única cadena base64 que contiene el IV y el ciphertext.
+ * Ideal para almacenar en una sola columna de texto.
+ *
+ * @param string $plaintext El texto a cifrar.
+ * @return string|null La cadena cifrada en base64, o null en caso de error.
+ */
+function encrypt_data(string $plaintext): ?string
+{
+    try {
+        $key = get_encryption_key();
+        $iv_length = openssl_cipher_iv_length(ENCRYPTION_CIPHER);
+        $iv = random_bytes($iv_length);
+        $ciphertext = openssl_encrypt($plaintext, ENCRYPTION_CIPHER, $key, OPENSSL_RAW_DATA, $iv);
+
+        if ($ciphertext === false) {
+            return null;
+        }
+
+        // Concatenar IV y ciphertext, y luego codificar en base64
+        return base64_encode($iv . $ciphertext);
+    } catch (Exception $e) {
+        error_log("Error de encriptación (encrypt_data): " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Descifra una cadena base64 que contiene el IV y el ciphertext.
+ *
+ * @param string $base64_string La cadena cifrada en base64.
+ * @return string|null El texto plano descifrado, o null en caso de error.
+ */
+function decrypt_data(string $base64_string): ?string
+{
+    try {
+        $key = get_encryption_key();
+        $decoded = base64_decode($base64_string, true);
+        if ($decoded === false) {
+            return null;
+        }
+
+        $iv_length = openssl_cipher_iv_length(ENCRYPTION_CIPHER);
+        if (mb_strlen($decoded, '8bit') < $iv_length) {
+            return null; // Datos corruptos o muy cortos
+        }
+        $iv = substr($decoded, 0, $iv_length);
+        $ciphertext = substr($decoded, $iv_length);
+
+        if (empty($ciphertext)) {
+            return null; // No hay ciphertext para desencriptar
+        }
+
+        $decrypted = openssl_decrypt($ciphertext, ENCRYPTION_CIPHER, $key, OPENSSL_RAW_DATA, $iv);
+        return $decrypted === false ? null : $decrypted;
+    } catch (Exception $e) {
+        error_log("Error de desencriptación (decrypt_data): " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
  * Genera un token CSRF.
  *
  * @return string Token CSRF.
