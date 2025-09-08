@@ -594,6 +594,7 @@ CREATE TABLE `users` (
   `assigned_admin_id` int DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT '1',
   `department_id` int DEFAULT NULL,
+  `theme` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'light',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `created_by` int DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -603,7 +604,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `password_hash`, `role`, `company_id`, `branch_id`, `assigned_admin_id`, `is_active`, `department_id`, `created_at`, `created_by`) VALUES
-(1, 'admin', '$2y$10$NlguZUw9cO1.weM9Sw2sL.1B61BTQNhv/5do/Z66SLZOR8Zo7OdIy', 'superadmin', NULL, NULL, NULL, 1, NULL, '2025-08-27 19:37:58', NULL),
+(1, 'admin', '$2y$10$NlguZUw9cO1.weM9Sw2sL.1B61BTQNhv/5do/Z66SLZOR8Zo7OdIy', 'superadmin', NULL, NULL, NULL, 1, NULL, '2025-08-27 19:37:58', NULL, 'light'),
 (7, 'BrianF', '$2y$10$c1TokUq/pEiBgwV07Gpl0ekWFJu6gcjhurDZMBuaWiGrsH30CzMcq', 'admin', 1, 1, NULL, 1, 1, '2025-08-29 14:23:03', 1),
 (8, 'juanp', '$2y$10$XTEQVVrGcECeUU2/5xU0ceTTOqhyeo2GifgIHDyMUprTItE7HgSQu', 'user', 2, 3, 1, 1, 1, '2025-08-29 20:10:43', 7),
 (9, 'pepea', '$2y$10$3NAssuFIKCg1WGSTurI1BOR8tsp3dQ92tOQ8O/QL6BOV0sUmzN/BK', 'user', 1, 1, 1, 1, 1, '2025-09-02 16:21:49', 7),

@@ -6,6 +6,13 @@ if (empty($_SESSION['csrf_token'])) {
 }
 $csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
 $user_role = $_SESSION['user_role'] ?? 'user';
+$user_id = $_SESSION['user_id'];
+$pdo = get_pdo_connection();
+$stmt = $pdo->prepare("SELECT theme FROM users WHERE id = ?");
+$stmt->execute([$user_id]);
+$user_data = $stmt->fetch();
+$user_theme = $user_data['theme'] ?? 'light';
+
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 error_reporting(E_ALL);
@@ -24,6 +31,7 @@ error_reporting(E_ALL);
 <body 
     data-csrf-token="<?php echo $csrf_token; ?>"
     data-user-role="<?php echo $user_role; ?>"
+    data-theme="<?= htmlspecialchars($user_theme) ?>"
     data-company-id="<?php echo $_SESSION['company_id'] ?? ''; ?>"
     data-branch-id="<?php echo $_SESSION['branch_id'] ?? ''; ?>"
     data-department-id="<?php echo $_SESSION['department_id'] ?? ''; ?>"
@@ -31,6 +39,15 @@ error_reporting(E_ALL);
     <div class="container">
         <header>
             <h1>Panel de Administración</h1>
+            <div class="theme-selector">
+                <label for="theme-select">🎨 Tema:</label>
+                <select id="theme-select">
+                    <option value="light">Claro</option>
+                    <option value="dark">Oscuro</option>
+                    <option value="blue">Azul</option>
+                    <option value="green">Verde</option>
+                </select>
+            </div>
             <a href="logout.php">Cerrar Sesión</a>
         </header>
         <nav class="tab-nav">

@@ -10,10 +10,11 @@ $username = $_SESSION['username'] ?? 'Usuario';
 $pdo = get_pdo_connection();
 
 // Obtener el admin asignado al usuario para el chat
-$stmt = $pdo->prepare("SELECT assigned_admin_id FROM users WHERE id = ?");
+$stmt = $pdo->prepare("SELECT assigned_admin_id, theme FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
 $user_data = $stmt->fetch();
 $admin_id = $user_data['assigned_admin_id'] ?? null;
+$user_theme = $user_data['theme'] ?? 'light';
 
 $nonce = base64_encode(random_bytes(16));
 $csrf_token = generate_csrf_token();
@@ -33,7 +34,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     <link rel="stylesheet" href="assets/css/main.css">
     <link rel="stylesheet" href="assets/css/panel.css">
 </head>
-<body>
+<body data-theme="<?= htmlspecialchars($user_theme) ?>">
     <!-- Datos ocultos para JS -->
     <input type="hidden" id="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
     <input type="hidden" id="admin_id" value="<?= htmlspecialchars($admin_id ?? '') ?>">
@@ -43,6 +44,15 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         <header class="admin-header">
             <h1>🔐 Mis Sitios (<?= htmlspecialchars($username) ?>)</h1>
             <div class="chat-logout">
+                <div class="theme-selector">
+                    <label for="theme-select">🎨 Tema:</label>
+                    <select id="theme-select">
+                        <option value="light">Claro</option>
+                        <option value="dark">Oscuro</option>
+                        <option value="blue">Azul</option>
+                        <option value="green">Verde</option>
+                    </select>
+                </div>
                 <button id="chat-toggle-btn" class="btn-secondary" <?= !$admin_id ? 'disabled title="No tienes un admin asignado"' : '' ?>>💬 Chatear con el Admin</button>
                 <a href="logout.php" class="btn-logout">Cerrar Sesión</a>
             </div>

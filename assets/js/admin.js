@@ -962,4 +962,31 @@ document.addEventListener('DOMContentLoaded', function() {
         fetchBranches();
         fetchDepartments();
     }
+
+    // --- Selector de Tema ---
+    const themeSelect = document.getElementById('theme-select');
+
+    function loadSavedTheme() {
+        const savedTheme = localStorage.getItem('userTheme') || 'light';
+        document.body.setAttribute('data-theme', savedTheme);
+        if (themeSelect) themeSelect.value = savedTheme;
+    }
+
+    async function setTheme(theme) {
+        document.body.setAttribute('data-theme', theme);
+        localStorage.setItem('userTheme', theme);
+
+        // Guardar en la base de datos en segundo plano
+        try {
+            await apiCall('api/save_theme.php', 'POST', { theme: theme });
+        } catch (error) {
+            console.error('No se pudo guardar el tema en la base de datos:', error);
+        }
+    }
+
+    themeSelect?.addEventListener('change', (e) => {
+        setTheme(e.target.value);
+    });
+
+    loadSavedTheme();
 });
