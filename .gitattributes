@@ -1,0 +1,17 @@
+# Set default behavior for all text files to let Git decide.
+# It will handle line endings automatically based on the platform.
+* text=auto
+
+#
+# The following are explicit overrides for files that should always be treated as text.
+# This ensures consistent line endings (LF) in the repository.
+#
+*.php text
+*.js text
+*.css text
+*.html text
+*.json text
+*.md text
+*.sql text
+*.txt text
+*.env.example text
