@@ -58,7 +58,7 @@ try {
                 $user_role = $_SESSION['user_role'] ?? 'user';
                 $sql = "
                     SELECT 
-                        id, username, role, is_active, company_id, branch_id, department_id
+                        id, username, role, is_active, company_id, branch_id, department_id, assigned_admin_id
                     FROM users 
                     WHERE id = ?";
                 $params = [$id];
@@ -83,6 +83,7 @@ try {
                 $user['company_id'] = $user['company_id'] ? (int)$user['company_id'] : null;
                 $user['branch_id'] = $user['branch_id'] ? (int)$user['branch_id'] : null;
                 $user['department_id'] = $user['department_id'] ? (int)$user['department_id'] : null;
+                $user['assigned_admin_id'] = $user['assigned_admin_id'] ? (int)$user['assigned_admin_id'] : null;
                 echo json_encode(['success' => true, 'data' => $user]);
             } elseif ($action === 'get_assigned_sites' && $id) {
                 $stmt = $pdo->prepare("
@@ -116,6 +117,7 @@ try {
             $branch_id = $input['branch_id'] ?? null;
             // ✅ Sanitize department_id to ensure it's an integer or null, preventing errors with empty strings.
             $department_id = filter_var($input['department_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
+            $assigned_admin_id = filter_var($input['assigned_admin_id'] ?? null, FILTER_VALIDATE_INT) ?: null;
             $assigned_sites = $input['assigned_sites'] ?? [];
             $current_user_role = $_SESSION['user_role'];
 
@@ -176,6 +178,11 @@ try {
                 $sql = "UPDATE users SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?, department_id = ?";
                 $params = [$username, $role, $is_active, $company_id, $branch_id, $department_id];
 
+                if ($current_user_role === 'superadmin') {
+                    $sql .= ", assigned_admin_id = ?";
+                    $params[] = $assigned_admin_id;
+                }
+
                 if (!empty($password)) {
                     $password_hash = password_hash($password, PASSWORD_DEFAULT);
                     $sql .= ", password_hash = ?";
@@ -219,10 +226,14 @@ try {
 
                 $created_by = $_SESSION['user_id'];
                 $stmt = $pdo->prepare("
-                    INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id, department_id, created_by)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id, department_id, created_by, assigned_admin_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ");
-                $stmt->execute([$username, $password_hash, $role, $is_active, $company_id, $branch_id, $department_id, $created_by]);
+                
+                // Only superadmin can set assigned_admin_id on creation
+                $insert_assigned_admin_id = ($current_user_role === 'superadmin') ? $assigned_admin_id : null;
+
+                $stmt->execute([$username, $password_hash, $role, $is_active, $company_id, $branch_id, $department_id, $created_by, $insert_assigned_admin_id]);
                 $newId = $pdo->lastInsertId();
 
                 // Asignar sitios

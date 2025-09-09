@@ -178,6 +178,15 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('department_id').value = CURRENT_USER_DEPARTMENT_ID;
             document.getElementById('department_id').disabled = true;
         }
+
+        // Mostrar/ocultar campo de admin asignado al abrir el modal de agregar
+        const adminGroup = document.getElementById('admin-assignment-group');
+        if (CURRENT_USER_ROLE === 'superadmin' && document.getElementById('role').value === 'user') {
+            adminGroup.style.display = 'block';
+            loadAdmins();
+        } else {
+            adminGroup.style.display = 'none';
+        }
         openModal('user-modal');
     });
 
@@ -217,6 +226,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('department_id').disabled = true;
                 }
 
+                // Mostrar/ocultar campo de admin asignado
+                const adminGroup = document.getElementById('admin-assignment-group');
+                if (CURRENT_USER_ROLE === 'superadmin' && user.role === 'user') {
+                    adminGroup.style.display = 'block';
+                    loadAdmins(user.assigned_admin_id || null);
+                } else {
+                    adminGroup.style.display = 'none';
+                }
+
                 openModal('user-modal');
             }
         }
@@ -243,6 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
             company_id: document.getElementById('company_id').value || null,
             branch_id: document.getElementById('branch_id').value || null,
             department_id: document.getElementById('department_id').value || null,
+            assigned_admin_id: document.getElementById('assigned_admin_id').value || null,
             assigned_sites: Array.from(document.querySelectorAll('.site-checkbox:checked'))
                 .map(cb => cb.value)
         };
@@ -254,6 +273,35 @@ document.addEventListener('DOMContentLoaded', function() {
             closeModal('user-modal');
             fetchUsers();
         }
+    });
+
+    // --- CARGAR ADMINISTRADORES ---
+    async function loadAdmins(selectedId = null) {
+        const select = document.getElementById('assigned_admin_id');
+        if (!select) return;
+
+        try {
+            const result = await apiCall('api/get_admins.php');
+            select.innerHTML = '<option value="">Ninguno (usuario sin admin)</option>';
+
+            if (result.success && Array.isArray(result.data)) {
+                result.data.forEach(admin => {
+                    const option = document.createElement('option');
+                    option.value = admin.id;
+                    option.textContent = admin.username;
+                    if (admin.id == selectedId) option.selected = true;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error al cargar admins:', error);
+            select.innerHTML = '<option value="">Error al cargar admins</option>';
+        }
+    }
+
+    document.getElementById('role').addEventListener('change', function() {
+        const adminGroup = document.getElementById('admin-assignment-group');
+        adminGroup.style.display = (CURRENT_USER_ROLE === 'superadmin' && this.value === 'user') ? 'block' : 'none';
     });
 
     // --- CARGA DE EMPRESAS Y SUCURSALES ---
@@ -778,7 +826,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!sitesTableBody) return;
         sitesTableBody.innerHTML = '';
         if (sites.length === 0) {
-            sitesTableBody.innerHTML = '<tr><td colspan="5">No hay sitios para mostrar.</td></tr>';
+            sitesTableBody.innerHTML = '<tr><td colspan="4">No hay sitios para mostrar.</td></tr>';
             return;
         }
         sites.forEach(site => {
@@ -787,7 +835,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>${escapeHtml(site.name)}</td>
                 <td><a href="${site.url}" target="_blank">${escapeHtml(site.url)}</a></td>
                 <td>${escapeHtml(site.username)}</td>
-                <td>${site.password_needs_update ? '✅ Sí' : '❌ No'}</td>
                 <td class="actions">
                     <button class="btn btn-sm btn-secondary edit-site-btn" data-site-id="${site.id}">Editar</button>
                     <button class="btn btn-sm btn-danger delete-site-btn" data-site-id="${site.id}">Eliminar</button>

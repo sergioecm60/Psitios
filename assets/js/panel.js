@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminId = document.getElementById('admin_id')?.value;
     const userId = document.getElementById('user_id')?.value;
     const chatModal = document.getElementById('chat-modal');
-    const chatToggleBtn = document.getElementById('chat-toggle-btn'); // Assuming this always exists
+    const chatToggleBtn = document.getElementById('chat-toggle-btn');
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
@@ -38,37 +38,49 @@ document.addEventListener('DOMContentLoaded', function() {
         return response.json();
     }
 
-    // --- Lógica de Pestañas ---
+    // --- LÓGICA DE PESTAÑAS COMPLETAMENTE SEPARADAS ---
     const tabs = document.querySelectorAll('.tab-link');
     const tabContents = document.querySelectorAll('.tab-content');
     
+    function showTab(tabId) {
+        // Ocultar todas las pestañas
+        tabs.forEach(t => t.classList.remove('active'));
+        tabContents.forEach(c => c.classList.remove('active'));
+        
+        // Mostrar la pestaña seleccionada
+        const activeTab = document.querySelector(`[data-tab="${tabId}"]`);
+        const activeTabContent = document.getElementById(tabId);
+        
+        if (activeTab) activeTab.classList.add('active');
+        if (activeTabContent) activeTabContent.classList.add('active');
+        
+        // Cargar el contenido específico de esa pestaña
+        loadTabContent(tabId);
+    }
+    
     function loadTabContent(tabId) {
         switch (tabId) {
-            case 'admin-sites-tab':
+            case 'sites-tab':
+                // Solo cargar sitios cuando se accede a la pestaña de sitios
                 fetchAdminSites();
-                break;
-            case 'user-sites-tab':
                 fetchUserSites();
                 break;
             case 'agenda-tab':
+                // Solo cargar agenda cuando se accede a la pestaña de agenda
                 loadAgenda();
                 break;
         }
     }
 
+    // Event listeners para las pestañas
     tabs.forEach(tab => {
         tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            tab.classList.add('active');
-            const activeTabId = tab.dataset.tab;
-            const activeTabContent = document.getElementById(activeTabId);
-            if (activeTabContent) activeTabContent.classList.add('active');
-            loadTabContent(activeTabId);
+            const tabId = tab.dataset.tab;
+            showTab(tabId);
         });
     });
 
-    // --- Generic Modal Handling ---
+    // --- CHAT FUNCTIONALITY ---
     chatToggleBtn?.addEventListener('click', () => openModal('chat-modal'));
 
     document.querySelectorAll('.close-button').forEach(btn => {
@@ -83,7 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Enviar mensaje
-    chatForm.addEventListener('submit', async (e) => {
+    chatForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const text = chatInput.value.trim();
         if (!text) return;
@@ -105,7 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     receiver_id: adminId
                 })
             });
-
+ 
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -127,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchChatMessages() {
         try {
             const response = await fetch('api/get_messages.php');
-
+ 
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`HTTP ${response.status}: ${errorText}`);
@@ -141,7 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <div class="chat-message ${isSent ? 'sent' : 'received'}">
                             <strong>${isSent ? 'Tú' : 'Admin'}:</strong> ${escapeHTML(msg.message)}
                             <br><small>${formatTime(msg.created_at)}</small>
-                            ${isSent ? `<button class="delete-msg-btn" data-id="${msg.id}" title="Eliminar">×</button>` : ''}
+                            ${isSent ? `<button class="delete-msg-btn" data-id="${msg.id}" title="Eliminar">×</button>` : ''} 
                         </div>
                     `;
                 }).join('');
@@ -154,10 +166,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Polling cada 10 segundos
     setInterval(fetchChatMessages, 10000);
-    chatToggleBtn.addEventListener('click', () => setTimeout(fetchChatMessages, 500));
+    chatToggleBtn?.addEventListener('click', () => setTimeout(fetchChatMessages, 500));
 
     // Eliminar mensaje
-    chatMessages.addEventListener('click', async (e) => {
+    chatMessages?.addEventListener('click', async (e) => {
         const deleteBtn = e.target.closest('.delete-msg-btn');
         if (deleteBtn && confirm('¿Eliminar este mensaje?')) {
             const id = deleteBtn.dataset.id;
@@ -165,8 +177,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 const response = await fetch('api/delete_user_message.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ message_id: id })
-                });
+                    body: JSON.JSON.stringify({ message_id: id })
+                }); 
                 const result = await response.json();
                 if (result.success) {
                     fetchChatMessages();
@@ -179,11 +191,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- CARGAR SITIOS ---
+    // --- FUNCIONES PARA LA PESTAÑA DE SITIOS ---
     async function fetchAdminSites() {
         const grid = document.getElementById('admin-sites-grid');
         if (!grid) return;
-        grid.innerHTML = '<div class="loading">Cargando sitios...</div>';
+        grid.innerHTML = '<div class="loading">Cargando sitios del administrador...</div>';
         try {
             const result = await apiCall('api/get_user_sites.php');
             if (result.success && result.data.length > 0) {
@@ -201,7 +213,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchUserSites() {
         const grid = document.getElementById('user-sites-grid');
         if (!grid) return;
-        grid.innerHTML = '<div class="loading">Cargando tus sitios...</div>';
+        grid.innerHTML = '<div class="loading">Cargando tus sitios personales...</div>';
         try {
             const result = await apiCall('api/get_user_sites_personal.php');
             if (result.success && result.data.length > 0) {
@@ -238,12 +250,99 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
 
-    // Carga inicial de la primera pestaña activa
-    const initialActiveTab = document.querySelector('.tab-link.active');
-    if (initialActiveTab) loadTabContent(initialActiveTab.dataset.tab);
+    // --- FUNCIONES PARA LA PESTAÑA DE AGENDA ---
+    const agendaTableBody = document.querySelector('#agenda-table tbody');
+    const reminderModal = document.getElementById('reminder-modal');
+    const reminderForm = document.getElementById('reminder-form');
+    const reminderTypeSelect = document.getElementById('reminder-type');
 
-    // --- MANEJO DE BOTONES DE SITIOS (VER, NOTIFICAR, REPORTAR) ---
+    async function loadAgenda() {
+        if (!agendaTableBody) return;
+        agendaTableBody.innerHTML = '<tr><td colspan="8" class="loading">Cargando agenda...</td></tr>';
+        
+        const result = await apiCall('api/get_user_reminders.php');
+        agendaTableBody.innerHTML = '';
+        
+        if (result.success && result.data.length > 0) {
+            result.data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.dataset.id = item.id; // Asignar ID para notificaciones
+                tr.innerHTML = `
+                    <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed == 1 ? 'checked' : ''}></td>
+                    <td>${item.type === 'credential' ? '🔑' : '📝'}</td>
+                    <td>${escapeHTML(item.title)}</td>
+                    <td>${escapeHTML(item.username || '')}</td> 
+                    <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-type="reminder">Mostrar</button>` : ''}</td>
+                    <td>${escapeHTML(item.notes || '')}</td>
+                    <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString() : ''}</td>
+                    <td><button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
+                `;
+                agendaTableBody.appendChild(tr);
+            });
+        } else if (result.success) {
+            agendaTableBody.innerHTML = '<tr><td colspan="8" class="no-reminders-cell">No tienes recordatorios en tu agenda.</td></tr>';
+        } else {
+            agendaTableBody.innerHTML = `<tr><td colspan="8" class="error">❌ ${result.message || 'Error al cargar la agenda.'}</td></tr>`;
+        }
+    }
+
+    // --- EVENT LISTENERS ESPECÍFICOS PARA SITIOS ---
+    document.getElementById('add-user-site-btn')?.addEventListener('click', () => {
+        const form = document.getElementById('user-site-form');
+        form.reset();
+        document.getElementById('user-site-id').value = '';
+        document.getElementById('user-site-modal-title').textContent = 'Agregar Sitio Personal';
+        openModal('user-site-modal');
+    });
+
+    document.getElementById('user-site-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        const result = await apiCall('api/save_user_site.php', 'POST', data);
+        if (result.success) {
+            closeModal('user-site-modal');
+            fetchUserSites(); // Recargar solo los sitios personales
+        } else {
+            alert('Error: ' + result.message);
+        }
+    });
+
+    // --- EVENT LISTENERS ESPECÍFICOS PARA AGENDA ---
+    document.getElementById('add-reminder-btn')?.addEventListener('click', () => {
+        reminderForm.reset();
+        document.getElementById('reminder-id').value = '';
+        document.getElementById('reminder-modal-title').textContent = 'Añadir Recordatorio';
+        toggleCredentialFields(); 
+        openModal('reminder-modal');
+    });
+
+    function toggleCredentialFields() {
+        const type = reminderTypeSelect?.value;
+        const fields = reminderModal?.querySelectorAll('.credential-field');
+        fields?.forEach(field => {
+            field.style.display = type === 'credential' ? 'block' : 'none';
+        });
+    }
+
+    reminderTypeSelect?.addEventListener('change', toggleCredentialFields);
+
+    reminderForm?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        const result = await apiCall('api/save_user_reminder.php', 'POST', data);
+        if (result.success) {
+            closeModal('reminder-modal');
+            loadAgenda(); // Recargar solo la agenda
+        } else {
+            alert('Error: ' + result.message);
+        }
+    });
+
+    // --- EVENT LISTENERS GENERALES PARA BOTONES DINÁMICOS ---
     document.querySelector('.container').addEventListener('click', async (e) => {
+        // Manejar botones de sitios (Ver credenciales, Notificar, Reportar, etc.)
         const viewBtn = e.target.closest('.btn-view-creds');
         if (viewBtn) {
             const serviceId = viewBtn.dataset.id;
@@ -270,7 +369,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify(body)
                 });
 
-                if (!response.ok) {
+                if (!response.ok) { 
                     const errorText = await response.text();
                     throw new Error(`Error ${response.status}: ${errorText}`);
                 }
@@ -295,6 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // Resto de botones de sitios...
         const notifyBtn = e.target.closest('.btn-notify-expired');
         if (notifyBtn) {
             if (!confirm('¿Contraseña expirada? Se notificará al admin.')) return;
@@ -375,50 +475,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await apiCall('api/delete_user_site.php', 'POST', { id });
             if (result.success) {
                 alert('Sitio eliminado.');
-                fetchUserSites();
+                fetchUserSites(); // Recargar solo sitios personales
             } else {
                 alert('Error al eliminar el sitio: ' + result.message);
             }
         }
     });
 
-    // --- AGENDA PERSONAL ---
-    const agendaTableBody = document.querySelector('#agenda-table tbody');
-    const reminderModal = document.getElementById('reminder-modal');
-    const reminderForm = document.getElementById('reminder-form');
-    const reminderTypeSelect = document.getElementById('reminder-type');
-
-    document.getElementById('add-reminder-btn')?.addEventListener('click', () => {
-        reminderForm.reset();
-        document.getElementById('reminder-id').value = '';
-        document.getElementById('reminder-modal-title').textContent = 'Añadir Recordatorio';
-        // Asegurarse de que los campos de credenciales se muestren u oculten correctamente
-        toggleCredentialFields(); 
-        openModal('reminder-modal');
-    });
-
-    async function loadAgenda() {
-        if (!agendaTableBody) return;
-        const result = await apiCall('api/get_user_reminders.php');
-        agendaTableBody.innerHTML = '';
-        if (result.success) {
-            result.data.forEach(item => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed == 1 ? 'checked' : ''}></td>
-                    <td>${item.type === 'credential' ? '🔑' : '📝'}</td>
-                    <td>${escapeHTML(item.title)}</td>
-                    <td>${escapeHTML(item.username || '')}</td>
-                    <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-type="reminder">Mostrar</button>` : ''}</td>
-                    <td>${escapeHTML(item.notes || '')}</td>
-                    <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString() : ''}</td>
-                    <td><button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
-                `;
-                agendaTableBody.appendChild(tr);
-            });
-        }
-    }
-
+    // --- EVENT LISTENERS ESPECÍFICOS PARA AGENDA ---
     agendaTableBody?.addEventListener('click', async (e) => {
         const decryptBtn = e.target.closest('.decrypt-pass');
         if (decryptBtn) {
@@ -443,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const id = deleteBtn.dataset.id;
             const result = await apiCall('api/delete_user_reminder.php', 'POST', { id });
             if (result.success) {
-                loadAgenda();
+                loadAgenda(); // Recargar solo agenda
             } else {
                 alert('Error: ' + result.message);
             }
@@ -456,54 +520,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 action: 'toggle_complete',
                 id: id
             });
-        }
-    });
-
-    // --- LÓGICA DE MODALES ---
-
-    // Modal de Sitios Personales
-    document.getElementById('add-user-site-btn')?.addEventListener('click', () => {
-        const form = document.getElementById('user-site-form');
-        form.reset();
-        document.getElementById('user-site-id').value = '';
-        document.getElementById('user-site-modal-title').textContent = 'Agregar Sitio Personal';
-        openModal('user-site-modal');
-    });
-
-    document.getElementById('user-site-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        const result = await apiCall('api/save_user_site.php', 'POST', data);
-        if (result.success) {
-            closeModal('user-site-modal');
-            fetchUserSites();
-        } else {
-            alert('Error: ' + result.message);
-        }
-    });
-
-    // Modal de Agenda
-    function toggleCredentialFields() {
-        const type = reminderTypeSelect.value;
-        const fields = reminderModal.querySelectorAll('.credential-field');
-        fields.forEach(field => {
-            field.style.display = type === 'credential' ? 'block' : 'none';
-        });
-    }
-
-    reminderTypeSelect?.addEventListener('change', toggleCredentialFields);
-
-    reminderForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        const result = await apiCall('api/save_user_reminder.php', 'POST', data);
-        if (result.success) {
-            closeModal('reminder-modal');
-            loadAgenda();
-        } else {
-            alert('Error: ' + result.message);
         }
     });
 
@@ -566,5 +582,64 @@ document.addEventListener('DOMContentLoaded', function() {
         setTheme(e.target.value);
     });
 
+    // --- INICIALIZACIÓN ---
     loadSavedTheme();
+    
+    // Cargar contenido de la primera pestaña activa (Mis Sitios por defecto)
+    const initialActiveTab = document.querySelector('.tab-link.active');
+    if (initialActiveTab) {
+        loadTabContent(initialActiveTab.dataset.tab);
+    }
+
+    // --- NOTIFICACIONES DE AGENDA ---
+    let notifiedReminders = new Set(); // Para evitar duplicados
+
+    function checkReminders() {
+        // Solo verificar si la pestaña de agenda está activa para ser más eficiente
+        if (!document.getElementById('agenda-tab')?.classList.contains('active')) {
+            return;
+        }
+
+        const now = new Date();
+
+        // Obtener recordatorios de la tabla
+        document.querySelectorAll('#agenda-table tbody tr').forEach(tr => {
+            const id = tr.dataset.id;
+            if (!id || notifiedReminders.has(id)) return;
+
+            const datetimeCell = tr.querySelector('td:nth-child(7)');
+            const datetimeText = datetimeCell?.textContent.trim();
+            
+            if (!datetimeText) return;
+
+            const reminderTime = new Date(datetimeText);
+            if (isNaN(reminderTime.getTime())) return;
+
+            if (reminderTime <= now) {
+                const title = tr.querySelector('td:nth-child(3)').textContent;
+                const username = tr.querySelector('td:nth-child(4)').textContent;
+                const notes = tr.querySelector('td:nth-child(6)').textContent;
+
+                showReminderAlert({
+                    id: id,
+                    title: title,
+                    username: username,
+                    notes: notes
+                });
+                notifiedReminders.add(id);
+            }
+        });
+    }
+
+    function showReminderAlert(reminder) {
+        let message = `🔔 Recordatorio: ${reminder.title}`;
+        if (reminder.username) message += `\n\nUsuario: ${reminder.username}`;
+        if (reminder.notes) message += `\nNota: ${reminder.notes}`;
+        alert(message);
+    }
+
+    // Verificar cada minuto
+    setInterval(checkReminders, 60000);
+    // Verificar inmediatamente al cargar la página
+    setTimeout(checkReminders, 2000);
 });

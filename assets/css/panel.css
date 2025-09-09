@@ -47,6 +47,107 @@ body {
     transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* --- PESTAÑAS PRINCIPALES --- */
+.tab-nav {
+    display: flex;
+    background: var(--bg-header);
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 20px;
+    border-radius: 8px 8px 0 0;
+    overflow: hidden;
+}
+
+.tab-link {
+    flex: 1;
+    padding: 15px 20px;
+    background: var(--bg-header);
+    border: none;
+    color: var(--text-secondary-color);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-color);
+}
+
+.tab-link.active {
+    background: var(--bg-container);
+    color: var(--primary-color);
+    border-bottom: 3px solid var(--primary-color);
+    font-weight: 600;
+}
+
+/* --- CONTENIDO DE PESTAÑAS --- */
+.tab-content {
+    display: none;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- SECCIONES ESPECÍFICAS --- */
+.sites-section {
+    margin-bottom: 30px;
+}
+
+.sites-section h2 {
+    color: var(--text-color);
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.agenda-section {
+    margin-bottom: 30px;
+}
+
+.agenda-section h2 {
+    color: var(--text-color);
+    margin-bottom: 15px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+/* --- MODALES --- */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    align-items: center;
+    justify-content: center;
+}
+
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: var(--bg-container);
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
 /* Chat */
 #chat-modal {
     display: none;
@@ -218,4 +319,68 @@ body {
     border-radius: 4px;
     background: var(--bg-container);
     color: var(--text-color);
+}
+
+/* --- TABLA DE AGENDA --- */
+.table-wrapper {
+    overflow-x: auto;
+    margin-top: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: var(--bg-container);
+}
+
+#agenda-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--bg-container);
+}
+
+#agenda-table th,
+#agenda-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+
+#agenda-table th {
+    background: var(--bg-header);
+    font-weight: 600;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#agenda-table tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+#agenda-table .loading,
+#agenda-table .error,
+.no-reminders-cell {
+    text-align: center;
+    padding: 20px;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 768px) {
+    .tab-link {
+        padding: 12px 10px;
+        font-size: 0.9rem;
+    }
+    
+    .sites-section h2,
+    .agenda-section h2 {
+        font-size: 1.3rem;
+    }
+    
+    .table-wrapper {
+        font-size: 0.85rem;
+    }
+    
+    #agenda-table th,
+    #agenda-table td {
+        padding: 8px;
+    }
 }

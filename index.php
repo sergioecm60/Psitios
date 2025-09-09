@@ -1,9 +1,20 @@
 <?php
 /**
- * index.php
+ * Psitios/index.php
  * Página de inicio de sesión para Psitios.
  */
 require_once 'bootstrap.php';
+
+// Configuración del footer
+$config = [
+    'footer' => [
+        'line1' => 'Soporte - Grupo Pedraza',
+        'line2' => 'By Sergio Cabrera | Copyleft (C) 2025',
+        'whatsapp_number' => '+5491167598452',
+        'whatsapp_svg_path' => 'M12.04 2C6.58 2 2.13 6.45 2.13 12c0 1.8.48 3.47 1.34 4.94L2 22l5.25-1.38c1.4.83 3.01 1.32 4.79 1.32h.01c5.46 0 9.9-4.44 9.9-9.94 0-5.5-4.44-9.91-9.9-9.91zM18.1 16.1c-.28-.14-1.65-.82-1.9-.91-.26-.1-.45-.14-.64.14-.19.28-.72.91-.88 1.1-.16.19-.32.21-.6.07-.28-.14-1.18-.43-2.25-1.39-.83-.75-1.39-1.67-1.56-1.95-.16-.28-.02-.43.12-.57.13-.13.28-.35.42-.52.14-.17.19-.28.28-.47.1-.19.05-.37-.02-.51-.07-.14-.64-1.54-.88-2.1-.24-.56-.48-.48-.64-.48-.17 0-.36-.02-.55-.02-.19 0-.5.07-.76.35-.26.28-1 .99-1 2.4 0 1.41 1.02 2.78 1.17 2.97.14.19 2 3.17 4.93 4.32 2.94 1.15 2.94.77 3.47.72.53-.05 1.65-.68 1.88-1.33.24-.65.24-1.2.17-1.34-.07-.14-.26-.21-.55-.35z',
+        'license_url' => 'license.php'
+    ]
+];
 
 // Generar un token CSRF para el formulario de login si no existe.
 generate_csrf_token();
@@ -27,7 +38,8 @@ if (isset($_SESSION['user_id'])) {
 </head>
 <body class="login-page">
     <div class="login-container">
-        <h1>Panel de Acceso Seguro</h1>
+        <img src="<?= BASE_URL ?>assets/images/pedraza-logo.png" alt="Logo Grupo Pedraza" class="logo">
+        <h1>Acceso a Psitios</h1>
         <form id="loginForm">
             <div class="form-group">
                 <label for="username">Usuario</label>
@@ -41,6 +53,22 @@ if (isset($_SESSION['user_id'])) {
         </form>
         <div id="loginError" class="error-message login-error hidden"></div>
     </div>
+
+    <footer class="footer">
+        <strong><?= htmlspecialchars($config['footer']['line1'] ?? '') ?></strong><br>
+        <div class="footer-contact-line">
+            <span><?= htmlspecialchars($config['footer']['line2'] ?? '') ?></span>
+            <?php if (!empty($config['footer']['whatsapp_number']) && !empty($config['footer']['whatsapp_svg_path'])): ?>
+                <a href="https://wa.me/<?= htmlspecialchars($config['footer']['whatsapp_number']) ?>" target="_blank" rel="noopener noreferrer" class="footer-whatsapp-link" aria-label="Contactar por WhatsApp" tabindex="0">
+                    <svg class="icon" role="img" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="<?= $config['footer']['whatsapp_svg_path'] ?>"/>
+                    </svg>
+                    <span><?= htmlspecialchars($config['footer']['whatsapp_number']) ?></span>
+                </a>
+            <?php endif; ?>
+        </div>
+        <a href="<?= htmlspecialchars($config['footer']['license_url'] ?? '#') ?>" target="_blank" rel="license">Términos y Condiciones (Licencia GNU GPL v3)</a>
+    </footer>
 
     <script>
         document.getElementById('loginForm').addEventListener('submit', async function(e) {

@@ -156,7 +156,6 @@ error_reporting(E_ALL);
                             <th>Nombre</th>
                             <th>URL</th>
                             <th>Usuario</th>
-                            <th>Requiere actualización</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
@@ -252,6 +251,12 @@ error_reporting(E_ALL);
                 <div class="form-group">
                     <label>Sitios Asignados</label>
                     <div id="sites-container"></div>
+                </div>
+                <div class="form-group" id="admin-assignment-group" style="display: none;">
+                    <label for="assigned_admin_id">Admin Asignado</label>
+                    <select id="assigned_admin_id" name="assigned_admin_id">
+                        <option value="">Ninguno (usuario sin admin)</option>
+                    </select>
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>

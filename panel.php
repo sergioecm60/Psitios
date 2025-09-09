@@ -1,6 +1,6 @@
 <?php
 /**
- * panel.php - Panel de usuario seguro con CSP, sin errores
+ * panel.php - Panel de usuario con 2 pestañas claras
  */
 require_once 'bootstrap.php';
 require_auth();
@@ -58,48 +58,53 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
             </div>
         </header>
 
+        <!-- Pestañas principales -->
         <nav class="tab-nav">
-            <button class="tab-link active" data-tab="admin-sites-tab">Sitios Asignados</button>
-            <button class="tab-link" data-tab="user-sites-tab">Mis Sitios Personales</button>
+            <button class="tab-link active" data-tab="sites-tab">🌐 Mis Sitios</button>
             <button class="tab-link" data-tab="agenda-tab">📅 Mi Agenda</button>
         </nav>
 
-        <!-- Pestaña de Sitios Asignados -->
-        <div id="admin-sites-tab" class="tab-content active">
-            <h2>🌐 Sitios Asignados por el Administrador</h2>
-            <div id="admin-sites-grid" class="services-grid">
-                <div class="loading">Cargando sitios...</div>
-            </div>
+        <!-- Pestaña 1: SOLO Mis Sitios -->
+        <div id="sites-tab" class="tab-content active">
+            <section class="sites-section">
+                <h2>🌐 Sitios Asignados por el Administrador</h2>
+                <div id="admin-sites-grid" class="services-grid">
+                    <div class="loading">Cargando sitios del admin...</div>
+                </div>
+            </section>
+
+            <hr class="content-divider">
+
+            <section class="sites-section">
+                <h2>🔐 Mis Sitios Personales</h2>
+                <button class="btn btn-primary" id="add-user-site-btn">+ Agregar Sitio Personal</button>
+                <div id="user-sites-grid" class="services-grid"></div>
+            </section>
         </div>
 
-        <!-- Pestaña de Sitios Personales -->
-        <div id="user-sites-tab" class="tab-content">
-            <h2>🔐 Mis Sitios Personales</h2>
-            <button class="btn btn-primary" id="add-user-site-btn">+ Agregar Sitio Personal</button>
-            <div id="user-sites-grid" class="services-grid"></div>
-        </div>
-
-        <!-- Pestaña de Agenda -->
+        <!-- Pestaña 2: SOLO Mi Agenda -->
         <div id="agenda-tab" class="tab-content">
-            <h2>📅 Mi Agenda Personal</h2>
-            <button class="btn btn-primary" id="add-reminder-btn">+ Añadir Recordatorio</button>
-            <div class="table-wrapper">
-                <table id="agenda-table">
-                    <thead>
-                        <tr>
-                            <th></th>
-                            <th>Tipo</th>
-                            <th>Título</th>
-                            <th>Usuario</th>
-                            <th>Contraseña</th>
-                            <th>Nota</th>
-                            <th>Recordatorio</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
+            <section class="agenda-section">
+                <h2>📅 Mi Agenda Personal</h2>
+                <button class="btn btn-primary" id="add-reminder-btn">+ Añadir Recordatorio</button>
+                <div class="table-wrapper">
+                    <table id="agenda-table">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Tipo</th>
+                                <th>Título</th>
+                                <th>Usuario</th>
+                                <th>Contraseña</th>
+                                <th>Nota</th>
+                                <th>Recordatorio</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
         </div>
 
     </div>
