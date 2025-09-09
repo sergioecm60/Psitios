@@ -3,7 +3,7 @@
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.style.display = 'block';
+        modal.classList.add('active');
     }
 }
 
@@ -11,7 +11,7 @@ function openModal(modalId) {
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.style.display = 'none';
+        modal.classList.remove('active');
     }
 }
 
@@ -43,6 +43,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if (event.target.classList.contains('modal')) {
             closeModal(event.target.id);
         }
+    });
+
+    // Manejar botones de cancelar en modales para evitar 'onclick' en línea
+    document.querySelectorAll('.close-modal-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const modalId = btn.dataset.modalId;
+            if (modalId) {
+                closeModal(modalId);
+            }
+        });
     });
 
     async function apiCall(url, method = 'GET', body = null) {

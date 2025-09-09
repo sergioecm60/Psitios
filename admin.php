@@ -260,7 +260,7 @@ error_reporting(E_ALL);
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('user-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary close-modal-btn" data-modal-id="user-modal">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -282,7 +282,7 @@ error_reporting(E_ALL);
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('company-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary close-modal-btn" data-modal-id="company-modal">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -322,7 +322,7 @@ error_reporting(E_ALL);
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('branch-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary close-modal-btn" data-modal-id="branch-modal">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -356,7 +356,7 @@ error_reporting(E_ALL);
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('department-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary close-modal-btn" data-modal-id="department-modal">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -402,7 +402,7 @@ error_reporting(E_ALL);
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('site-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary close-modal-btn" data-modal-id="site-modal">Cancelar</button>
                 </div>
             </form>
         </div>

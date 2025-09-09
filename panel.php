@@ -1,6 +1,6 @@
 <?php
 /**
- * panel.php - Panel de usuario con 2 pestañas claras
+ * /Psitios/panel.php - Panel de usuario con 2 pestañas claras
  */
 require_once 'bootstrap.php';
 require_auth();
@@ -140,7 +140,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('user-site-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary close-modal-btn" data-modal-id="user-site-modal">Cancelar</button>
                 </div>
             </form>
         </div>
@@ -201,7 +201,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('reminder-modal')">Cancelar</button>
+                    <button type="button" class="btn btn-secondary close-modal-btn" data-modal-id="reminder-modal">Cancelar</button>
                 </div>
             </form>
         </div>

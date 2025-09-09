@@ -80,6 +80,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
+    // Manejar botones de cancelar en modales para evitar 'onclick' en línea
+    document.querySelectorAll('.close-modal-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const modalId = btn.dataset.modalId;
+            if (modalId) {
+                closeModal(modalId);
+            }
+        });
+    });
+
     // --- CHAT FUNCTIONALITY ---
     chatToggleBtn?.addEventListener('click', () => openModal('chat-modal'));
 
