@@ -18,7 +18,7 @@ try {
     } else {
         // Obtener todos los sitios personales del usuario
         $stmt = $pdo->prepare(
-            "SELECT id, name, url, username, (password_encrypted IS NOT NULL AND password_encrypted != '') AS has_password 
+            "SELECT id, name, url, username, (password_encrypted IS NOT NULL AND password_encrypted != '') AS has_password
              FROM user_sites 
              WHERE user_id = ? 
              ORDER BY name ASC"
@@ -32,4 +32,10 @@ try {
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Error interno del servidor.']);
 }
+
+if (ob_get_level()) {
+    ob_end_clean();
+}
+exit;
+
 ?>
