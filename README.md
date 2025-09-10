@@ -1,21 +1,21 @@
 # Psitios - Panel de Gestión Segura y Jerárquica
 
-Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso de múltiples usuarios a diferentes sitios o servicios web. El sistema está diseñado con una arquitectura jerárquica de roles (`SuperAdmin`, `Admin`, `Usuario`) que permite un aislamiento de datos efectivo, ideal para entornos multi-cliente o con múltiples sucursales.
+Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso de múltiples usuarios a diferentes sitios o servicios web. El sistema está diseñado con una arquitectura jerárquica de roles y datos (`SuperAdmin` > `Admin` > `Usuario` y `Empresa` > `Sucursal` > `Departamento`) que permite un aislamiento de datos efectivo, ideal para entornos multi-cliente o con múltiples sucursales.
 
 ## ✨ Características Principales
 
 *   **Gestión Jerárquica de Roles:**
-    *   **SuperAdmin:** Control total sobre el sistema, incluyendo la gestión de empresas, sucursales y todos los usuarios.
+    *   **SuperAdmin:** Control total sobre el sistema. Gestiona empresas, sucursales, departamentos y todos los usuarios.
     *   **Admin:** Gestiona una empresa/sucursal específica, con visibilidad de datos aislada a su propio ámbito.
     *   **Usuario:** Rol final que accede a los servicios que su administrador le asigna.
 *   **Bóveda Segura de Credenciales:**
     *   Las contraseñas de los sitios se almacenan en la base de datos utilizando encriptación fuerte **AES-256-CBC**.
-    *   Las contraseñas de los usuarios del panel se hashean con el algoritmo moderno y seguro **Argon2ID**.
+    *   Las contraseñas de los usuarios del panel se hashean con el algoritmo moderno y seguro **BCRYPT** (a través de `password_hash` con `PASSWORD_DEFAULT`).
 *   **Aislamiento de Datos (Multi-Tenant):**
-    *   Un `Admin` solo puede ver y gestionar los usuarios, sitios y mensajes pertenecientes a su sucursal, garantizando la privacidad entre diferentes clientes o departamentos.
+    *   Un `Admin` solo puede ver y gestionar los usuarios, sitios y mensajes pertenecientes a su departamento, garantizando la privacidad entre diferentes clientes.
 *   **Gestión Avanzada de Sitios:**
-    *   Los `Admins` pueden crear sitios `privados` para su uso exclusivo.
-    *   El `SuperAdmin` puede crear sitios `compartidos` que pueden ser asignados por cualquier `Admin` a sus usuarios.
+    *   Los `Admins` pueden crear sitios y asignarlos a los usuarios de su departamento.
+    *   El `SuperAdmin` puede crear sitios y asignarlos a departamentos específicos.
 *   **Comunicación Integrada:**
     *   Sistema de chat directo y seguro entre los `Usuarios` y su `Admin` creador.
 *   **Sistema de Notificaciones y Alertas:**
@@ -28,12 +28,13 @@ Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso 
 
 *   **Backend:** PHP 8.3+
 *   **Base de Datos:** MySQL 8.x / Percona Server
-*   **Frontend:** JavaScript (ES6+) asíncrono con Fetch API.
+*   **Frontend:** JavaScript (ES6+) nativo (Vanilla JS) con un enfoque modular y asíncrono (Fetch API).
 *   **Seguridad:**
-    *   **Hashing de Contraseñas:** `Argon2ID`
+    *   **Hashing de Contraseñas:** `BCRYPT` (vía `password_hash`).
     *   **Encriptación de Datos:** `AES-256-CBC`
-    *   **Protección Web:** CSRF Tokens en todas las peticiones que modifican datos, y Content-Security-Policy (CSP) con Nonce en el panel de usuario.
+    *   **Protección Web:** CSRF Tokens en todas las peticiones que modifican datos, y Content-Security-Policy (CSP) con Nonce para prevenir ataques XSS.
     *   **Base de Datos:** Uso exclusivo de Prepared Statements (PDO) para prevenir inyección SQL.
+    *   **Manejo de Errores:** Gestión centralizada de errores para evitar la exposición de información sensible.
 
 ## 🚀 Instalación y Configuración
 
@@ -45,7 +46,7 @@ Sigue estos pasos para poner en marcha el proyecto en tu entorno de desarrollo (
 cd c:\laragon\www
 
 # Clona el proyecto (si está en GitHub)
-git clone <URL_DEL_REPOSITORIO> Psitios
+git clone https://github.com/sergioecm60/Psitios.git
 
 # Entra en el directorio del proyecto
 cd Psitios
@@ -54,7 +55,7 @@ cd Psitios
 ### 2. Instalar Dependencias
 Asegúrate de tener Composer instalado y ejecuta el siguiente comando en la raíz del proyecto:
 ```bash
-composer install
+composer update
 ```
 Esto instalará `phpdotenv` y cualquier otra dependencia definida en `composer.json`.
 
