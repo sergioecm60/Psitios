@@ -38,17 +38,15 @@ Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso 
 
 ## 🚀 Instalación y Configuración
 
-Sigue estos pasos para poner en marcha el proyecto en tu entorno de desarrollo (como Laragon).
+El proyecto incluye un script de instalación interactivo que automatiza todo el proceso. Sigue estos pasos:
 
-### 1. Clonar el Repositorio (si usas Git)
+### 1. Clonar el Repositorio
 ```bash
 # Navega a tu directorio de proyectos (ej. c:\laragon\www)
 cd c:\laragon\www
 
 # Clona el proyecto (si está en GitHub)
 git clone https://github.com/sergioecm60/Psitios.git
-
-# Entra en el directorio del proyecto
 cd Psitios
 ```
 
