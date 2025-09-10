@@ -7,81 +7,82 @@
  * como el botón para reportar problemas.
  */
 
-document.addEventListener('DOMContentLoaded', function() {
-    // --- 1. CONFIGURACIÓN GLOBAL ---
-    const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-    const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
+// --- 1. CONFIGURACIÓN GLOBAL Y HELPERS ---
+// Se definen en el ámbito global (fuera de DOMContentLoaded) para que estén
+// disponibles de inmediato para otros scripts.
+const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
 
-    // --- 2. HELPERS (Funciones de Ayuda) ---
-
-    /**
-     * Objeto ayudante que centraliza y estandariza todas las llamadas fetch a la API.
-     * Proporciona un manejo de errores robusto para problemas de red, respuestas no-JSON,
-     * y errores del servidor, además de adjuntar automáticamente el token CSRF.
-     */
-    window.api = {
-        async _request(endpoint, options = {}) {
-            try {
-                const response = await fetch(endpoint, options);
-                // Si la respuesta no es OK, intenta parsear el error del cuerpo.
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error(`Respuesta de error del servidor (${response.status}) para ${endpoint}:`, errorText);
-                    try {
-                        return JSON.parse(errorText);
-                    } catch (e) {
-                        return { success: false, message: `Error del servidor: ${response.status}. Revise la consola.` };
-                    }
+/**
+ * Objeto ayudante que centraliza y estandariza todas las llamadas fetch a la API.
+ * Proporciona un manejo de errores robusto para problemas de red, respuestas no-JSON,
+ * y errores del servidor, además de adjuntar automáticamente el token CSRF.
+ */
+window.api = {
+    async _request(endpoint, options = {}) {
+        try {
+            const response = await fetch(endpoint, options);
+            // Si la respuesta no es OK, intenta parsear el error del cuerpo.
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`Respuesta de error del servidor (${response.status}) para ${endpoint}:`, errorText);
+                try {
+                    return JSON.parse(errorText);
+                } catch (e) {
+                    return { success: false, message: `Error del servidor: ${response.status}. Revise la consola.` };
                 }
-                // Verifica si la respuesta es JSON antes de intentar parsearla.
-                const contentType = response.headers.get("content-type");
-                if (contentType && contentType.includes("application/json")) {
-                    return await response.json();
-                } else {
-                    const responseText = await response.text();
-                    console.error(`Respuesta inesperada (no-JSON) para ${endpoint}:`, responseText);
-                    return { success: false, message: 'El servidor devolvió una respuesta en un formato inesperado.' };
-                }
-            } catch (error) {
-                // Captura errores de red (ej. sin conexión).
-                console.error(`Error de red para ${endpoint}:`, error);
-                return { success: false, message: 'Error de conexión. Verifique su red.' };
             }
-        },
-        async get(endpoint) {
-            return this._request(endpoint);
-        },
-        async post(endpoint, data) {
-            // Comprobación de seguridad: no intentar hacer POST sin token.
-            if (!csrfToken) {
-                console.error('CSRF token no disponible. No se puede hacer POST.');
-                return { success: false, message: 'Error de seguridad. Recargue la página.' };
+            // Verifica si la respuesta es JSON antes de intentar parsearla.
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("application/json")) {
+                return await response.json();
+            } else {
+                const responseText = await response.text();
+                console.error(`Respuesta inesperada (no-JSON) para ${endpoint}:`, responseText);
+                return { success: false, message: 'El servidor devolvió una respuesta en un formato inesperado.' };
             }
-
-            return this._request(endpoint, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken 
-                },
-                body: JSON.stringify(data)
-            });
+        } catch (error) {
+            // Captura errores de red (ej. sin conexión).
+            console.error(`Error de red para ${endpoint}:`, error);
+            return { success: false, message: 'Error de conexión. Verifique su red.' };
         }
-    };
+    },
+    async get(endpoint) {
+        return this._request(endpoint);
+    },
+    async post(endpoint, data) {
+        // Comprobación de seguridad: no intentar hacer POST sin token.
+        if (!csrfToken) {
+            console.error('CSRF token no disponible. No se puede hacer POST.');
+            return { success: false, message: 'Error de seguridad. Recargue la página.' };
+        }
 
-    /**
-     * Escapa caracteres HTML de una cadena para prevenir ataques XSS.
-     * Utiliza `textContent` para una sanitización segura y recomendada.
-     * @param {*} str - El valor a escapar.
-     * @returns {string} - La cadena segura.
-     */
-    window.escapeHTML = function(str) {
-        if (str === null || str === undefined) return '';
-        const p = document.createElement('p');
-        p.textContent = String(str);
-        return p.innerHTML;
-    };
-    // --- 3. LÓGICA DE COMPONENTES GLOBALES ---
+        return this._request(endpoint, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': csrfToken 
+            },
+            body: JSON.stringify(data)
+        });
+    }
+};
+
+/**
+ * Escapa caracteres HTML de una cadena para prevenir ataques XSS.
+ * Utiliza `textContent` para una sanitización segura y recomendada.
+ * @param {*} str - El valor a escapar.
+ * @returns {string} - La cadena segura.
+ */
+window.escapeHTML = function(str) {
+    if (str === null || str === undefined) return '';
+    const p = document.createElement('p');
+    p.textContent = String(str);
+    return p.innerHTML;
+};
+
+// --- 2. LÓGICA DE COMPONENTES GLOBALES (Dependiente del DOM) ---
+document.addEventListener('DOMContentLoaded', function() {
     // Se usa delegación de eventos en `document.body` para manejar clics en botones
     // que pueden ser creados dinámicamente, como los de las tarjetas de servicio.
     document.body.addEventListener('click', async (e) => {

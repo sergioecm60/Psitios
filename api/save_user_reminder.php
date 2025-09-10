@@ -49,7 +49,7 @@ try {
     $user_id = $_SESSION['user_id'];
     $action = $input['action'] ?? null;
 
-    switch ($action) {
+    switch ($action) { // El caso 'default' ahora maneja la lógica de 'add' y 'edit'.
         case 'toggle_complete':
             $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
             if (!$id) send_json_error(400, 'ID de recordatorio requerido.');
@@ -64,8 +64,7 @@ try {
             }
             break;
 
-        case 'add':
-        case 'edit':
+        default: // Maneja 'add' y 'edit' basándose en la presencia de un ID.
             // Validación de campos
             $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
             $type = $input['type'] ?? '';
@@ -82,7 +81,7 @@ try {
             // Prevenir duplicados
             $checkSql = "SELECT id FROM user_reminders WHERE title = ? AND user_id = ?";
             $checkParams = [$title, $user_id];
-            if ($action === 'edit' && $id) {
+            if ($id) { // Si estamos editando, excluimos el ID actual de la comprobación.
                 $checkSql .= " AND id != ?";
                 $checkParams[] = $id;
             }
@@ -92,14 +91,12 @@ try {
                 send_json_error(409, 'Ya tienes un recordatorio con este título.');
             }
 
-            if ($action === 'add') {
+            if (!$id) { // Modo Creación (no hay ID)
                 $encrypted_password = ($type === 'credential' && !empty($password)) ? encrypt_data($password) : null;
                 $stmt = $pdo->prepare("INSERT INTO user_reminders (user_id, type, title, username, password_encrypted, notes, reminder_datetime) VALUES (?, ?, ?, ?, ?, ?, ?)");
                 $stmt->execute([$user_id, $type, $title, $username, $encrypted_password, $notes, $reminder_datetime]);
                 echo json_encode(['success' => true, 'message' => 'Recordatorio agregado.', 'id' => (int)$pdo->lastInsertId()]);
-            } else { // 'edit'
-                if (!$id) send_json_error(400, 'ID de recordatorio requerido para editar.');
-
+            } else { // Modo Edición (hay ID)
                 $sql = "UPDATE user_reminders SET type = ?, title = ?, username = ?, notes = ?, reminder_datetime = ?";
                 $params = [$type, $title, $username, $notes, $reminder_datetime];
 
@@ -123,9 +120,6 @@ try {
                 }
             }
             break;
-
-        default:
-            send_json_error(400, 'Acción no válida.');
     }
 } catch (Exception $e) {
     error_log("Error en save_user_reminder.php: " . $e->getMessage());
