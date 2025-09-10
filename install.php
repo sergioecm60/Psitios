@@ -148,7 +148,7 @@ if (empty($db_pass)) {
 
 try {
     writeln("-> Creando base de datos '$db_name'...", COLOR_CYAN);
-    $pdo_root->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+    $pdo_root->exec("CREATE DATABASE IF NOT EXISTS `$db_name` CHARACTER SET utf8mb4 COLLATE utf8mb4_spanish2_ci;");
 
     writeln("-> Creando usuario '$db_user'...", COLOR_CYAN);
     $pdo_root->exec("CREATE USER IF NOT EXISTS '$db_user'@'localhost' IDENTIFIED BY '$db_pass';");
