@@ -34,11 +34,7 @@ try {
     $user_id = $_SESSION['user_id'];
 
     // Consulta segura que obtiene los detalles y verifica la propiedad del sitio.
-    // Se añade `password_encrypted IS NOT NULL AS has_password` para ser consistente con otras APIs
-    // y permitir que el frontend sepa si debe mostrar opciones de credenciales.
-    $stmt = $pdo->prepare(
-        "SELECT id, name, url, username, notes, password_encrypted IS NOT NULL AS has_password FROM user_sites WHERE id = ? AND user_id = ?"
-    );
+    $stmt = $pdo->prepare("SELECT id, name, url, username, notes FROM user_sites WHERE id = ? AND user_id = ?");
     $stmt->execute([$id, $user_id]);
     $site = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -46,9 +42,8 @@ try {
         send_json_error_and_exit(404, 'Sitio no encontrado o no tiene permiso para verlo.');
     }
 
-    // Formatear los datos para consistencia en la respuesta JSON.
+    // Formatear el ID como entero para consistencia.
     $site['id'] = (int)$site['id'];
-    $site['has_password'] = (bool)$site['has_password'];
 
     echo json_encode(['success' => true, 'data' => $site]);
 

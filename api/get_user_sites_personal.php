@@ -11,6 +11,7 @@
 if (ob_get_level()) {
     ob_end_clean();
 }
+ob_start();
 
 // Carga el archivo de arranque y requiere autenticación.
 require_once '../bootstrap.php';
@@ -18,6 +19,14 @@ require_auth();
 
 // Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json');
+
+// Función de ayuda para estandarizar las respuestas de error.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
+    exit;
+}
 
 // El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {
@@ -28,27 +37,25 @@ try {
 
     if ($id) {
         // MODO 1: Obtener un sitio personal específico por su ID.
-        // Se añade `password_encrypted IS NOT NULL AS has_password` para informar al cliente
-        // si existe una contraseña, sin exponer el dato encriptado, lo cual es una mejora de seguridad.
-        // La cláusula `AND user_id = ?` sigue siendo crucial para la seguridad.
-        $stmt = $pdo->prepare("SELECT id, name, url, username, notes, password_encrypted IS NOT NULL AS has_password FROM user_sites WHERE id = ? AND user_id = ?");
+        // La cláusula `AND user_id = ?` es crucial para la seguridad, asegurando que un usuario
+        // solo pueda solicitar datos de un sitio que le pertenece.
+        $stmt = $pdo->prepare("SELECT id, name, url, username, notes FROM user_sites WHERE id = ? AND user_id = ?");
         $stmt->execute([$id, $user_id]);
         $site = $stmt->fetch(PDO::FETCH_ASSOC);
 
         // Si no se encuentra el sitio, devolver un error 404.
         if (!$site) {
-            send_json_error_and_exit(404, 'Sitio no encontrado o no tiene permiso para verlo.');
+            send_json_error(404, 'Sitio no encontrado o no tiene permiso para verlo.');
         }
 
         // Formatear los datos para asegurar tipos consistentes en la respuesta JSON.
         $site['id'] = (int)$site['id'];
-        $site['has_password'] = (bool)$site['has_password'];
 
         echo json_encode(['success' => true, 'data' => $site]);
     } else {
         // MODO 2: Obtener todos los sitios personales del usuario.
         $stmt = $pdo->prepare(
-            "SELECT id, name, password_encrypted IS NOT NULL AS has_password
+            "SELECT id, name
              FROM user_sites 
              WHERE user_id = ? 
              ORDER BY name ASC"
@@ -59,12 +66,17 @@ try {
         // Formatear los datos para asegurar tipos consistentes en la respuesta JSON.
         foreach ($sites as &$site) {
             $site['id'] = (int)$site['id'];
-            $site['has_password'] = (bool)$site['has_password'];
         }
 
         echo json_encode(['success' => true, 'data' => $sites]);
     }
-} catch (Throwable $e) {
-    // Captura cualquier error o excepción, lo registra y devuelve una respuesta de error genérica.
-    send_json_error_and_exit(500, 'Error al cargar los sitios personales.', $e);
+} catch (Exception $e) {
+    error_log("Error en get_user_sites_personal.php: " . $e->getMessage());
+    send_json_error(500, 'Error al cargar los sitios personales.');
 }
+
+// Envía el contenido del buffer de salida y termina la ejecución.
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;

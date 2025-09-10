@@ -22,12 +22,8 @@ $config = [
     ]
 ];
 
-// Generar un token CSRF para el formulario de login solo si no existe uno en la sesión.
-// Esto previene que el token cambie si el usuario tiene múltiples pestañas abiertas,
-// lo que causaría fallos de validación al intentar iniciar sesión.
-if (empty($_SESSION['csrf_token'])) {
-    generate_csrf_token();
-}
+// Generar un token CSRF para el formulario de login si no existe.
+generate_csrf_token(); // La función está en config/security.php
 
 // Si el usuario ya está logueado, redirigir al panel correspondiente.
 if (isset($_SESSION['user_id'])) {

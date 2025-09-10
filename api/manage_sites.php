@@ -10,6 +10,7 @@
 if (ob_get_level()) {
     ob_end_clean();
 }
+ob_start();
 
 // Carga el archivo de arranque y requiere autenticación de administrador.
 require_once __DIR__ . '/../bootstrap.php';
@@ -17,6 +18,14 @@ require_auth('admin');
 
 // Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json; charset=utf-8');
+
+// Función de ayuda para estandarizar las respuestas de error.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
+    exit;
+}
 
 // --- Lógica Principal ---
 try {
@@ -56,7 +65,7 @@ try {
 
                 case 'get':
                     $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-                    if (!$id) send_json_error_and_exit(400, 'ID de sitio inválido.');
+                    if (!$id) send_json_error(400, 'ID de sitio inválido.');
 
                     $sql = "SELECT id, name, url, username, notes, department_id, password_encrypted IS NOT NULL as has_password FROM sites WHERE id = ?";
                     $params = [$id];
@@ -70,7 +79,7 @@ try {
                     $stmt->execute($params);
                     $site = $stmt->fetch(PDO::FETCH_ASSOC);
 
-                    if (!$site) send_json_error_and_exit(404, 'Sitio no encontrado o sin permisos.');
+                    if (!$site) send_json_error(404, 'Sitio no encontrado o sin permisos.');
 
                     $site['id'] = (int)$site['id'];
                     $site['department_id'] = $site['department_id'] ? (int)$site['department_id'] : null;
@@ -80,16 +89,16 @@ try {
                     break;
 
                 default:
-                    send_json_error_and_exit(400, 'Acción GET no válida.');
+                    send_json_error(400, 'Acción GET no válida.');
             }
             break;
 
         case 'POST':
             $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-            if (!verify_csrf_token($csrf_token)) send_json_error_and_exit(403, 'Token CSRF inválido.');
+            if (!verify_csrf_token($csrf_token)) send_json_error(403, 'Token CSRF inválido.');
 
             $input = json_decode(file_get_contents('php://input'), true);
-            if (json_last_error() !== JSON_ERROR_NONE) send_json_error_and_exit(400, 'JSON inválido.');
+            if (json_last_error() !== JSON_ERROR_NONE) send_json_error(400, 'JSON inválido.');
 
             $action = $input['action'] ?? null;
             switch ($action) {
@@ -103,8 +112,8 @@ try {
                     $password = $input['password'] ?? null;
                     $notes = trim($input['notes'] ?? '');
 
-                    if (empty($name) || empty($url)) send_json_error_and_exit(400, 'Nombre y URL son requeridos.');
-                    if (!filter_var('http://' . preg_replace('#^https?://#', '', $url), FILTER_VALIDATE_URL)) send_json_error_and_exit(400, 'URL no válida.');
+                    if (empty($name) || empty($url)) send_json_error(400, 'Nombre y URL son requeridos.');
+                    if (!filter_var('http://' . preg_replace('#^https?://#', '', $url), FILTER_VALIDATE_URL)) send_json_error(400, 'URL no válida.');
 
                     // Lógica de departamento
                     $department_id = null;
@@ -121,13 +130,13 @@ try {
                     if ($action === 'edit') $check_params[] = $id;
                     $stmt = $pdo->prepare($check_sql);
                     $stmt->execute($check_params);
-                    if ($stmt->fetch()) send_json_error_and_exit(409, 'Ya existe un sitio con este nombre.');
+                    if ($stmt->fetch()) send_json_error(409, 'Ya existe un sitio con este nombre.');
 
                     // Encriptar contraseña si se proporciona
                     $encrypted_data = null;
                     if ($password !== null && $password !== '') {
                         $encrypted_data = encrypt_to_parts($password);
-                        if (!$encrypted_data) send_json_error_and_exit(500, 'Error al encriptar la contraseña.');
+                        if (!$encrypted_data) send_json_error(500, 'Error al encriptar la contraseña.');
                     }
 
                     if ($action === 'add') {
@@ -141,7 +150,7 @@ try {
                         $stmt->execute($params);
                         echo json_encode(['success' => true, 'message' => 'Sitio creado.', 'id' => (int)$pdo->lastInsertId()]);
                     } else { // edit
-                        if (!$id) send_json_error_and_exit(400, 'ID de sitio no proporcionado para editar.');
+                        if (!$id) send_json_error(400, 'ID de sitio no proporcionado para editar.');
                         $sql_parts = ["name = ?", "url = ?", "username = ?", "notes = ?"];
                         $params = [$name, $url, $username, $notes];
                         if ($user_role === 'superadmin') {
@@ -172,14 +181,14 @@ try {
                         if ($stmt->rowCount() > 0) {
                             echo json_encode(['success' => true, 'message' => 'Sitio actualizado.']);
                         } else {
-                            send_json_error_and_exit(404, 'Sitio no encontrado, sin permisos o sin cambios.');
+                            send_json_error(404, 'Sitio no encontrado, sin permisos o sin cambios.');
                         }
                     }
                     break;
 
                 case 'delete':
                     $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
-                    if (!$id) send_json_error_and_exit(400, 'ID de sitio no válido.');
+                    if (!$id) send_json_error(400, 'ID de sitio no válido.');
 
                     // Obtener el nombre del sitio ANTES de eliminarlo para poder registrarlo.
                     $stmt_get_name = $pdo->prepare("SELECT name FROM sites WHERE id = ?");
@@ -191,7 +200,7 @@ try {
                     $stmt = $pdo->prepare("SELECT COUNT(*) FROM services WHERE site_id = ?");
                     $stmt->execute([$id]);
                     if ($stmt->fetchColumn() > 0) {
-                        send_json_error_and_exit(400, 'No se puede eliminar el sitio porque está asignado a uno o más usuarios.');
+                        send_json_error(400, 'No se puede eliminar el sitio porque está asignado a uno o más usuarios.');
                     }
 
                     $sql = "DELETE FROM sites WHERE id = ?";
@@ -207,23 +216,31 @@ try {
                         log_action($pdo, $current_user_id, null, "site_deleted: {$site_name_for_log}", $_SERVER['REMOTE_ADDR']);
                         echo json_encode(['success' => true, 'message' => 'Sitio eliminado.']);
                     } else {
-                        send_json_error_and_exit(404, 'Sitio no encontrado o sin permisos.');
+                        send_json_error(404, 'Sitio no encontrado o sin permisos.');
                     }
                     break;
 
                 default:
-                    send_json_error_and_exit(400, 'Acción POST no válida.');
+                    send_json_error(400, 'Acción POST no válida.');
             }
             break;
 
         default:
-            send_json_error_and_exit(405, 'Método no permitido.');
+            send_json_error(405, 'Método no permitido.');
     }
 } catch (PDOException $e) {
+    error_log("Error de BD en manage_sites.php: " . $e->getMessage());
     if ($e->getCode() == '23000') {
-        send_json_error_and_exit(409, 'Error de integridad de datos. Es posible que el nombre ya exista.', $e);
+        send_json_error(409, 'Error de integridad de datos. Es posible que el nombre ya exista.');
     }
-    send_json_error_and_exit(500, 'Error de base de datos.', $e);
-} catch (Throwable $e) {
-    send_json_error_and_exit(500, 'Error interno del servidor.', $e);
+    send_json_error(500, 'Error de base de datos.');
+} catch (Exception $e) {
+    error_log("Error en manage_sites.php: " . $e->getMessage());
+    send_json_error(500, 'Error interno del servidor.');
 }
+
+// Envía el contenido del buffer de salida y termina la ejecución.
+if (ob_get_level()) {
+    ob_end_flush();
+}
+exit;
