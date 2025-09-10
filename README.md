@@ -38,14 +38,14 @@ Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso 
 
 ## 🚀 Instalación y Configuración
 
-El proyecto incluye un script de instalación interactivo que automatiza todo el proceso. Sigue estos pasos:
+El proyecto incluye un script de instalación interactivo que automatiza todo el proceso. Para instalar, sigue estos sencillos pasos.
 
 ### 1. Clonar el Repositorio
 ```bash
 # Navega a tu directorio de proyectos (ej. c:\laragon\www)
 cd c:\laragon\www
 
-# Clona el proyecto (si está en GitHub)
+# Clona el proyecto
 git clone https://github.com/sergioecm60/Psitios.git
 cd Psitios
 ```
