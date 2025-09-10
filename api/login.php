@@ -9,9 +9,7 @@
 
 // Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
-    ob_end_clean();
-}
-ob_start();
+    ob_end_clean();}
 
 // Carga el archivo de arranque, que inicia la sesión y carga todas las dependencias y funciones.
 require_once __DIR__ . '/../bootstrap.php';
@@ -19,38 +17,30 @@ require_once __DIR__ . '/../bootstrap.php';
 // Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json');
 
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
-
 // --- Validación de la Solicitud ---
 
 // 1. Verificar el método HTTP. Este endpoint solo debe aceptar solicitudes POST.
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    send_json_error(405, 'Método no permitido.');
+    send_json_error_and_exit(405, 'Método no permitido.');
 }
 
 // 2. Validar el token CSRF para proteger contra ataques de falsificación de solicitudes.
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
-    send_json_error(403, 'Token CSRF inválido.');
+    send_json_error_and_exit(403, 'Token CSRF inválido.');
 }
 
 // 3. Leer, decodificar y validar los datos de entrada (JSON).
 $input = json_decode(file_get_contents('php://input'), true);
 if (json_last_error() !== JSON_ERROR_NONE) {
-    send_json_error(400, 'JSON inválido.');
+    send_json_error_and_exit(400, 'JSON inválido.');
 }
 
 $username = trim($input['username'] ?? '');
 $password = $input['password'] ?? '';
 
 if (empty($username) || empty($password)) {
-    send_json_error(400, 'Usuario y contraseña son requeridos.');
+    send_json_error_and_exit(400, 'Usuario y contraseña son requeridos.');
 }
 
 // --- Lógica Principal de Autenticación ---
@@ -106,14 +96,9 @@ try {
         ]);
     } else {
         // Fallo en la autenticación (usuario no encontrado, inactivo o contraseña incorrecta).
-        send_json_error(401, 'Usuario o contraseña incorrectos.');
+        send_json_error_and_exit(401, 'Usuario o contraseña incorrectos.');
     }
-} catch (Exception $e) {
+} catch (Throwable $e) {
     // Si ocurre una excepción, se registra el error y se envía una respuesta genérica.
-    error_log("Error en login.php: " . $e->getMessage());
-    send_json_error(500, 'Error interno del servidor.');
+    send_json_error_and_exit(500, 'Error interno del servidor.', $e);
 }
-
-// Envía el contenido del buffer de salida y termina la ejecución del script.
-ob_end_flush();
-exit;

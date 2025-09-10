@@ -5,34 +5,26 @@
  */
 
 if (ob_get_level()) {
-    ob_end_clean();
-}
-ob_start();
+    ob_end_clean();}
 
 require_once '../bootstrap.php';
-require_auth('admin', true);
+require_auth('admin');
 header('Content-Type: application/json');
 
 $data = json_decode(file_get_contents('php://input'), true);
 if (json_last_error() !== JSON_ERROR_NONE) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'JSON inválido.']);
-    exit;
+    send_json_error_and_exit(400, 'JSON inválido.');
 }
 
 // Validar CSRF desde header
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido.']);
-    exit;
+    send_json_error_and_exit(403, 'Token CSRF inválido.');
 }
 
 $notification_id = filter_var($data['notification_id'] ?? null, FILTER_VALIDATE_INT);
 if (!$notification_id) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'ID de notificación no válido.']);
-    exit;
+    send_json_error_and_exit(400, 'ID de notificación no válido.');
 }
 
 $pdo = get_pdo_connection();
@@ -45,9 +37,7 @@ try {
     $notification = $stmt->fetch();
 
     if (!$notification) {
-        http_response_code(404);
-        echo json_encode(['success' => false, 'message' => 'Notificación no encontrada.']);
-        exit;
+        send_json_error_and_exit(404, 'Notificación no encontrada.');
     }
 
     // Marcar como resuelta
@@ -71,13 +61,6 @@ try {
         'message' => 'Notificación resuelta y servicio actualizado.'
     ]);
 
-} catch (Exception $e) {
-    error_log("Error en resolve_notification.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error interno.']);
+} catch (Throwable $e) {
+    send_json_error_and_exit(500, 'Error interno del servidor.', $e);
 }
-
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

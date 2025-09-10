@@ -8,9 +8,7 @@
 
 // Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
-    ob_end_clean();
-}
-ob_start();
+    ob_end_clean();}
 
 // Carga el archivo de arranque y requiere autenticación.
 require_once '../bootstrap.php';
@@ -21,14 +19,6 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
-
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
 
 // --- Lógica Principal ---
 try {
@@ -71,16 +61,16 @@ try {
 
     case 'POST':
         $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-        if (!verify_csrf_token($csrf_token)) send_json_error(403, 'Token CSRF inválido.');
+        if (!verify_csrf_token($csrf_token)) send_json_error_and_exit(403, 'Token CSRF inválido.');
 
         $input = json_decode(file_get_contents('php://input'), true);
-        if (json_last_error() !== JSON_ERROR_NONE) send_json_error(400, 'JSON inválido.');
+        if (json_last_error() !== JSON_ERROR_NONE) send_json_error_and_exit(400, 'JSON inválido.');
 
         $action = $input['action'] ?? null;
         switch ($action) {
             case 'mark_read':
                 $id = filter_var($input['notification_id'] ?? null, FILTER_VALIDATE_INT);
-                if (!$id) send_json_error(400, 'ID de notificación requerido.');
+                if (!$id) send_json_error_and_exit(400, 'ID de notificación requerido.');
 
                 $sql = "UPDATE notifications n ";
                 $params = [];
@@ -99,7 +89,7 @@ try {
                 if ($stmt->rowCount() > 0) {
                     echo json_encode(['success' => true, 'message' => 'Marcada como leída.']);
                 } else {
-                    send_json_error(404, 'Notificación no encontrada o sin permisos.');
+                    send_json_error_and_exit(404, 'Notificación no encontrada o sin permisos.');
                 }
                 break;
 
@@ -122,7 +112,7 @@ try {
 
             case 'delete':
                 $id = filter_var($input['notification_id'] ?? null, FILTER_VALIDATE_INT);
-                if (!$id) send_json_error(400, 'ID de notificación requerido.');
+                if (!$id) send_json_error_and_exit(400, 'ID de notificación requerido.');
 
                 $sql = "DELETE n FROM notifications n ";
                 $params = [];
@@ -141,25 +131,18 @@ try {
                 if ($stmt->rowCount() > 0) {
                     echo json_encode(['success' => true, 'message' => 'Notificación eliminada.']);
                 } else {
-                    send_json_error(404, 'Notificación no encontrada o sin permisos.');
+                    send_json_error_and_exit(404, 'Notificación no encontrada o sin permisos.');
                 }
                 break;
 
             default:
-                send_json_error(400, 'Acción no válida.');
+                send_json_error_and_exit(400, 'Acción no válida.');
         }
         break;
 
     default:
-        send_json_error(405, 'Método no permitido.');
+        send_json_error_and_exit(405, 'Método no permitido.');
 }
-} catch (Exception $e) {
-    error_log("Error en notifications_api.php: " . $e->getMessage());
-    send_json_error(500, 'Error interno del servidor.');
+} catch (Throwable $e) {
+    send_json_error_and_exit(500, 'Error interno del servidor.', $e);
 }
-
-// Envía el contenido del buffer de salida y termina la ejecución.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

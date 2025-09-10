@@ -8,9 +8,7 @@
 
 // Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
-    ob_end_clean();
-}
-ob_start();
+    ob_end_clean();}
 
 // Carga el archivo de arranque y requiere autenticación de administrador.
 require_once __DIR__ . '/../bootstrap.php';
@@ -19,32 +17,24 @@ require_auth('admin');
 // Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json');
 
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
-
 // --- Validación de la Solicitud ---
 
 // 1. Verificar el método HTTP.
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method !== 'POST') {
-    send_json_error(405, 'Método no permitido.');
+    send_json_error_and_exit(405, 'Método no permitido.');
 }
 
 // 2. Validar el token CSRF.
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
-    send_json_error(403, 'Token CSRF inválido.');
+    send_json_error_and_exit(403, 'Token CSRF inválido.');
 }
 
 // 3. Leer y decodificar el cuerpo de la solicitud JSON.
 $input = json_decode(file_get_contents('php://input'), true);
 if (json_last_error() !== JSON_ERROR_NONE) {
-    send_json_error(400, 'JSON inválido.');
+    send_json_error_and_exit(400, 'JSON inválido.');
 }
 
 // --- Lógica Principal ---
@@ -62,7 +52,7 @@ try {
             $province = trim($input['province'] ?? '');
 
             if (empty($name) || !$company_id || empty($province)) {
-                send_json_error(400, 'Nombre, empresa y provincia son requeridos.');
+                send_json_error_and_exit(400, 'Nombre, empresa y provincia son requeridos.');
             }
 
             // ✅ Prevenir duplicados: verificar si ya existe una sucursal con ese nombre en la misma empresa.
@@ -70,14 +60,14 @@ try {
             $checkParams = [$name, $company_id];
             if ($action === 'edit') {
                 $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
-                if (!$id) send_json_error(400, 'ID de sucursal inválido para editar.');
+                if (!$id) send_json_error_and_exit(400, 'ID de sucursal inválido para editar.');
                 $checkSql .= " AND id != ?";
                 $checkParams[] = $id;
             }
             $stmt = $pdo->prepare($checkSql);
             $stmt->execute($checkParams);
             if ($stmt->fetch()) {
-                send_json_error(409, 'Ya existe una sucursal con este nombre en la empresa seleccionada.');
+                send_json_error_and_exit(409, 'Ya existe una sucursal con este nombre en la empresa seleccionada.');
             }
 
             if ($action === 'add') {
@@ -95,14 +85,14 @@ try {
         case 'delete':
             $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
             if (!$id) {
-                send_json_error(400, 'ID de sucursal inválido.');
+                send_json_error_and_exit(400, 'ID de sucursal inválido.');
             }
 
             // ✅ Validación de dependencias: no permitir eliminar si tiene departamentos.
             $stmt = $pdo->prepare("SELECT COUNT(*) FROM departments WHERE branch_id = ?");
             $stmt->execute([$id]);
             if ($stmt->fetchColumn() > 0) {
-                send_json_error(400, 'No se puede eliminar la sucursal porque tiene departamentos asignados.');
+                send_json_error_and_exit(400, 'No se puede eliminar la sucursal porque tiene departamentos asignados.');
             }
 
             $stmt = $pdo->prepare("DELETE FROM branches WHERE id = ?");
@@ -112,28 +102,19 @@ try {
                 log_action($pdo, $_SESSION['user_id'], null, 'branch_deleted', $_SERVER['REMOTE_ADDR']);
                 echo json_encode(['success' => true, 'message' => 'Sucursal eliminada.']);
             } else {
-                send_json_error(404, 'Sucursal no encontrada.');
+                send_json_error_and_exit(404, 'Sucursal no encontrada.');
             }
             break;
 
         default:
-            send_json_error(400, 'Acción no válida.');
+            send_json_error_and_exit(400, 'Acción no válida.');
             break;
     }
-} catch (PDOException $e) {
-    error_log("Error de base de datos en manage_branches.php: " . $e->getMessage());
-    // Código '23000' es de violación de integridad (ej. clave foránea).
-    if ($e->getCode() == '23000') {
-        send_json_error(400, 'No se puede eliminar la sucursal porque tiene elementos asociados (ej. usuarios).');
+} catch (Throwable $e) {
+    // Si es una excepción de PDO por violación de integridad, damos un mensaje específico.
+    if ($e instanceof PDOException && $e->getCode() == '23000') {
+        send_json_error_and_exit(400, 'No se puede realizar la operación porque hay elementos asociados (ej. usuarios, departamentos).');
     }
-    send_json_error(500, 'Error de base de datos.');
-} catch (Exception $e) {
-    error_log("Error en manage_branches.php: " . $e->getMessage());
-    send_json_error(500, 'Error interno del servidor.');
+    // Para cualquier otro error, se registra y se devuelve un error genérico.
+    send_json_error_and_exit(500, 'Error interno del servidor.', $e);
 }
-
-// Envía el contenido del buffer de salida y termina la ejecución.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

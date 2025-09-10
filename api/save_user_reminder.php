@@ -7,7 +7,6 @@
 
 // Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) ob_end_clean();
-ob_start();
 
 // Carga el archivo de arranque y requiere autenticación.
 require_once '../bootstrap.php';
@@ -16,31 +15,23 @@ require_auth();
 // Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json');
 
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
-
 // --- Validación de la Solicitud ---
 
 // 1. Verificar el método HTTP.
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    send_json_error(405, 'Método no permitido.');
+    send_json_error_and_exit(405, 'Método no permitido.');
 }
 
 // 2. Validar el token CSRF.
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
-    send_json_error(403, 'Token CSRF inválido.');
+    send_json_error_and_exit(403, 'Token CSRF inválido.');
 }
 
 // 3. Leer y decodificar el cuerpo de la solicitud JSON.
 $input = json_decode(file_get_contents('php://input'), true);
 if (json_last_error() !== JSON_ERROR_NONE) {
-    send_json_error(400, 'JSON inválido.');
+    send_json_error_and_exit(400, 'JSON inválido.');
 }
 
 // --- Lógica Principal ---
@@ -52,7 +43,7 @@ try {
     switch ($action) { // El caso 'default' ahora maneja la lógica de 'add' y 'edit'.
         case 'toggle_complete':
             $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
-            if (!$id) send_json_error(400, 'ID de recordatorio requerido.');
+            if (!$id) send_json_error_and_exit(400, 'ID de recordatorio requerido.');
 
             $stmt = $pdo->prepare("UPDATE user_reminders SET is_completed = NOT is_completed WHERE id = ? AND user_id = ?");
             $stmt->execute([$id, $user_id]);
@@ -60,7 +51,7 @@ try {
             if ($stmt->rowCount() > 0) {
                 echo json_encode(['success' => true, 'message' => 'Estado actualizado.']);
             } else {
-                send_json_error(404, 'Recordatorio no encontrado o sin permisos.');
+                send_json_error_and_exit(404, 'Recordatorio no encontrado o sin permisos.');
             }
             break;
 
@@ -75,7 +66,7 @@ try {
             $reminder_datetime = !empty($input['reminder_datetime']) ? date('Y-m-d H:i:s', strtotime($input['reminder_datetime'])) : null;
 
             if (empty($title) || !in_array($type, ['credential', 'note'])) {
-                send_json_error(400, 'El tipo y el título son requeridos.');
+                send_json_error_and_exit(400, 'El tipo y el título son requeridos.');
             }
 
             // Prevenir duplicados
@@ -88,7 +79,7 @@ try {
             $stmt = $pdo->prepare($checkSql);
             $stmt->execute($checkParams);
             if ($stmt->fetch()) {
-                send_json_error(409, 'Ya tienes un recordatorio con este título.');
+                send_json_error_and_exit(409, 'Ya tienes un recordatorio con este título.');
             }
 
             if (!$id) { // Modo Creación (no hay ID)
@@ -116,18 +107,11 @@ try {
                 if ($stmt->rowCount() > 0) {
                     echo json_encode(['success' => true, 'message' => 'Recordatorio actualizado.']);
                 } else {
-                    send_json_error(404, 'Recordatorio no encontrado o sin cambios.');
+                    send_json_error_and_exit(404, 'Recordatorio no encontrado o sin cambios.');
                 }
             }
             break;
     }
-} catch (Exception $e) {
-    error_log("Error en save_user_reminder.php: " . $e->getMessage());
-    send_json_error(500, 'Error interno al guardar el recordatorio.');
+} catch (Throwable $e) {
+    send_json_error_and_exit(500, 'Error interno al guardar el recordatorio.', $e);
 }
-
-// Envía el contenido del buffer de salida y termina la ejecución.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

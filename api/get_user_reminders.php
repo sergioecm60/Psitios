@@ -7,9 +7,7 @@
 
 // Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
-    ob_end_clean();
-}
-ob_start();
+    ob_end_clean();}
 
 // Carga el archivo de arranque (`bootstrap.php`), que inicia la sesión y carga
 // todas las configuraciones y funciones de ayuda.
@@ -19,14 +17,6 @@ require_auth(); // Permite a cualquier usuario autenticado ver sus propios recor
 
 // Informa al cliente que la respuesta de este script será en formato JSON.
 header('Content-Type: application/json');
-
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
 
 // El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {
@@ -67,15 +57,7 @@ try {
     // 5. Enviar la respuesta exitosa.
     echo json_encode(['success' => true, 'data' => $reminders]);
 
-} catch (Exception $e) {
-    // Si ocurre una excepción, se registra el error para depuración
-    // y se envía una respuesta de error genérica al usuario.
-    error_log("Error en get_user_reminders.php: " . $e->getMessage());
-    send_json_error(500, 'Error interno del servidor al cargar la agenda.');
+} catch (Throwable $e) {
+    // Si ocurre una excepción, se registra el error y se envía una respuesta genérica.
+    send_json_error_and_exit(500, 'Error interno del servidor al cargar la agenda.', $e);
 }
-
-// Envía el contenido del buffer de salida (la respuesta JSON) y termina la ejecución del script.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

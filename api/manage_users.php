@@ -7,21 +7,11 @@
 // api/manage_users.php
 
 if (ob_get_level()) {
-    ob_end_clean();
-}
-ob_start();
+    ob_end_clean();}
 
 require_once __DIR__ . '/../bootstrap.php';
 require_auth('admin'); // Permite 'admin' y 'superadmin'
 header('Content-Type: application/json');
-
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
 
 try {
     $pdo = get_pdo_connection();
@@ -80,7 +70,7 @@ try {
                 $stmt->execute($params);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if (!$user) {
-                    send_json_error(404, 'Usuario no encontrado o sin permisos.');
+                    send_json_error_and_exit(404, 'Usuario no encontrado o sin permisos.');
                 }
                 $user['is_active'] = (bool)$user['is_active'];
                 $user['id'] = (int)$user['id'];
@@ -110,11 +100,7 @@ try {
         case 'POST':
             $input = json_decode(file_get_contents('php://input'), true);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                // ✅ Código de estado HTTP 400: Bad Request
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'JSON inválido']);
-                ob_end_flush();
-                exit;
+                send_json_error_and_exit(400, 'JSON inválido');
             }
 
             $action = $input['action'] ?? null;
@@ -143,16 +129,10 @@ try {
  
             if ($action === 'delete') {
                 if (!$id) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'message' => 'ID de usuario requerido para eliminar.']);
-                    ob_end_flush();
-                    exit;
+                    send_json_error_and_exit(400, 'ID de usuario requerido para eliminar.');
                 }
                 if ($id == $_SESSION['user_id']) {
-                    http_response_code(403);
-                    echo json_encode(['success' => false, 'message' => 'No puedes eliminar tu propia cuenta.']);
-                    ob_end_flush();
-                    exit;
+                    send_json_error_and_exit(403, 'No puedes eliminar tu propia cuenta.');
                 }
 
                 $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
@@ -162,18 +142,13 @@ try {
                     log_action($pdo, $_SESSION['user_id'], null, 'user_deleted', $_SERVER['REMOTE_ADDR']);
                     echo json_encode(['success' => true, 'message' => 'Usuario eliminado.']);
                 } else {
-                    http_response_code(404);
-                    echo json_encode(['success' => false, 'message' => 'Usuario no encontrado.']);
+                    send_json_error_and_exit(404, 'Usuario no encontrado.');
                 }
-                ob_end_flush();
                 exit;
             }
  
             if (in_array($action, ['add', 'edit']) && empty($username)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Usuario es requerido']);
-                ob_end_flush();
-                exit;
+                send_json_error_and_exit(400, 'Usuario es requerido');
             }
 
             if ($id) {
@@ -181,10 +156,7 @@ try {
                 $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? AND id != ?");
                 $stmt->execute([$username, $id]);
                 if ($stmt->fetch()) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'message' => 'Usuario ya existe']);
-                    ob_end_flush();
-                    exit;
+                    send_json_error_and_exit(409, 'El nombre de usuario ya existe.');
                 }
 
                 $sql = "UPDATE users SET username = ?, role = ?, is_active = ?, company_id = ?, branch_id = ?, department_id = ?";
@@ -228,10 +200,7 @@ try {
                 $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
                 $stmt->execute([$username]);
                 if ($stmt->fetch()) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'message' => 'Usuario ya existe']);
-                    ob_end_flush();
-                    exit;
+                    send_json_error_and_exit(409, 'El nombre de usuario ya existe.');
                 }
 
                 $password_hash = $password ? password_hash($password, PASSWORD_DEFAULT) : password_hash('temp123', PASSWORD_DEFAULT);
@@ -259,16 +228,8 @@ try {
             break;
 
         default:
-            http_response_code(405);
-            echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+            send_json_error_and_exit(405, 'Método no permitido');
     }
-} catch (Exception $e) {
-    error_log("Error en manage_users.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error interno']);
+} catch (Throwable $e) {
+    send_json_error_and_exit(500, 'Error interno del servidor.', $e);
 }
-
-if (ob_get_level()) {
-    ob_end_flush();
-}// ✅ Final del archivo
-exit;
