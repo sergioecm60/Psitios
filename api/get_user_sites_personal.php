@@ -55,7 +55,7 @@ try {
     } else {
         // MODO 2: Obtener todos los sitios personales del usuario.
         $stmt = $pdo->prepare(
-            "SELECT id, name, url, username, password_encrypted IS NOT NULL AS has_password
+            "SELECT id, name, password_encrypted IS NOT NULL AS has_password
              FROM user_sites 
              WHERE user_id = ? 
              ORDER BY name ASC"

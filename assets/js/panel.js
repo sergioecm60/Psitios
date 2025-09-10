@@ -194,7 +194,6 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="service-card">
                 <h3>${window.escapeHTML(item.name)}</h3>
                 ${isAssigned && item.password_needs_update ? '<p class="notification">⚠️ Contraseña pendiente</p>' : ''}
-                ${item.url ? `<a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-launch">🌐 Acceder</a>` : ''}
                 <div class="credentials-area">
                     ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isAssigned ? 'assigned' : 'personal'}">👁️ Ver</button>` : ''}
                     ${isAssigned ? `<button class="btn-notify-expired" data-id="${id}" ${item.password_needs_update ? 'disabled' : ''}>⏳ Notificar</button>` : ''}
@@ -365,7 +364,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const editSiteBtn = e.target.closest('.btn-edit-site');
         if (editSiteBtn) {
             const id = editSiteBtn.dataset.id;
-            const result = await window.api.get(`api/get_user_sites_personal.php?id=${id}`);
+            const form = document.getElementById('user-site-form');
+            
+            // Mostrar un estado de carga antes de abrir el modal
+            form.reset();
+            document.getElementById('user-site-modal-title').textContent = 'Cargando...';
+            openModal('user-site-modal');
+
+            // Llamar al nuevo endpoint de detalles
+            const result = await window.api.get(`api/get_user_site_details.php?id=${id}`);
+
             if (result.success) {
                 const site = result.data;
                 const form = document.getElementById('user-site-form');
@@ -376,7 +384,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('user-site-url').value = site.url;
                 document.getElementById('user-site-username').value = site.username;
                 document.getElementById('user-site-notes').value = site.notes;
-                openModal('user-site-modal');
+            } else {
+                alert('Error al cargar los detalles del sitio: ' + result.message);
+                closeModal('user-site-modal');
             }
         }
 
