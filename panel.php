@@ -17,7 +17,11 @@ $admin_id = $user_data['assigned_admin_id'] ?? null;
 $user_theme = $user_data['theme'] ?? 'light';
 
 $nonce = base64_encode(random_bytes(16));
-$csrf_token = generate_csrf_token();
+// Generar token CSRF solo si no existe para mantenerlo estable durante la sesión del usuario.
+if (empty($_SESSION['csrf_token'])) {
+    generate_csrf_token();
+}
+$csrf_token = $_SESSION['csrf_token'];
 
 // Content Security Policy (CSP) segura
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self'; connect-src 'self';");
