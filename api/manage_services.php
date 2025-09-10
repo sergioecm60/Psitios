@@ -2,99 +2,165 @@
 
 /**
  * api/manage_services.php
- * API para gestionar las asignaciones de servicios a los usuarios (CRUD).
+ * API para gestionar las asignaciones de sitios (servicios) a los usuarios.
+ * Permite listar, obtener, añadir, editar y eliminar asignaciones.
+ * Utilizado por el panel de administración.
  */
 
+// Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
     ob_end_clean();
 }
 ob_start();
 
+// Carga el archivo de arranque y requiere autenticación de administrador.
 require_once '../bootstrap.php';
 require_auth('admin');
 
+// Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json');
-$pdo = get_pdo_connection();
-$method = $_SERVER['REQUEST_METHOD'];
 
-try {
-    if ($method === 'GET') {
-        $action = $_GET['action'] ?? null;
-
-        if ($action === 'list' && isset($_GET['user_id'])) {
-            $user_id = filter_input(INPUT_GET, 'user_id', FILTER_VALIDATE_INT);
-            if (!$user_id) throw new InvalidArgumentException('ID de usuario no válido.');
-
-            $stmt = $pdo->prepare(
-                "SELECT s.id, st.name as site_name, st.username as service_username, st.password_needs_update
-                 FROM services s
-                 JOIN sites st ON s.site_id = st.id
-                 WHERE s.user_id = ?
-                 ORDER BY st.name ASC"
-            );
-            $stmt->execute([$user_id]);
-            echo json_encode($stmt->fetchAll());
-
-        } elseif ($action === 'get' && isset($_GET['id'])) {
-            $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-            if (!$id) throw new InvalidArgumentException('ID de servicio no válido.');
-
-            $stmt = $pdo->prepare("SELECT id, user_id, site_id, notes FROM services WHERE id = ?");
-            $stmt->execute([$id]);
-            $service = $stmt->fetch();
-            if (!$service) throw new Exception('Servicio no encontrado.');
-            
-            echo json_encode(['success' => true, 'data' => $service]);
-        } else {
-            throw new InvalidArgumentException('Acción GET no válida.');
-        }
-
-    } elseif ($method === 'POST') {
-        $data = json_decode(file_get_contents('php://input'), true);
-        if (json_last_error() !== JSON_ERROR_NONE) throw new InvalidArgumentException('Datos JSON no válidos.');
-        
-        if (!verify_csrf_token($data['csrf_token'] ?? '')) throw new Exception('Error de seguridad (CSRF).');
-
-        $action = $data['action'] ?? null;
-
-        if ($action === 'add') {
-            $user_id = filter_var($data['user_id'], FILTER_VALIDATE_INT);
-            $site_id = filter_var($data['site_id'], FILTER_VALIDATE_INT);
-            $notes = trim($data['notes'] ?? '');
-
-            if (!$user_id || !$site_id) throw new InvalidArgumentException('Usuario y Sitio son requeridos.');
-
-            $stmt = $pdo->prepare("INSERT INTO services (user_id, site_id, notes) VALUES (?, ?, ?)");
-            $stmt->execute([$user_id, $site_id, $notes]);
-            echo json_encode(['success' => true]);
-
-        } elseif ($action === 'edit') {
-            $id = filter_var($data['id'], FILTER_VALIDATE_INT);
-            $site_id = filter_var($data['site_id'], FILTER_VALIDATE_INT);
-            $notes = trim($data['notes'] ?? '');
-
-            if (!$id || !$site_id) throw new InvalidArgumentException('ID de servicio y Sitio son requeridos.');
-
-            $stmt = $pdo->prepare("UPDATE services SET site_id = ?, notes = ? WHERE id = ?");
-            $stmt->execute([$site_id, $notes, $id]);
-            echo json_encode(['success' => true]);
-
-        } elseif ($action === 'delete' && isset($data['id'])) {
-            $id = filter_var($data['id'], FILTER_VALIDATE_INT);
-            if (!$id) throw new InvalidArgumentException('ID de servicio no válido.');
-            $stmt = $pdo->prepare("DELETE FROM services WHERE id = ?");
-            $stmt->execute([$id]);
-            echo json_encode(['success' => true]);
-        } else {
-            throw new InvalidArgumentException('Acción POST no válida.');
-        }
-    }
-} catch (Exception $e) {
-    error_log("Error en manage_services.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error interno del servidor.']);
+// Función de ayuda para estandarizar las respuestas de error.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
+    exit;
 }
 
+// --- Lógica Principal ---
+$method = $_SERVER['REQUEST_METHOD'];
+$pdo = get_pdo_connection();
+$current_user_role = $_SESSION['user_role'] ?? 'user';
+$current_user_department_id = $_SESSION['department_id'] ?? null;
+
+try {
+    switch ($method) {
+        case 'GET':
+            $action = $_GET['action'] ?? null;
+
+            if ($action === 'list' && isset($_GET['user_id'])) {
+                $user_id = filter_input(INPUT_GET, 'user_id', FILTER_VALIDATE_INT);
+                if (!$user_id) send_json_error(400, 'ID de usuario no válido.');
+
+                // ✅ Security: Admin can only list services for users in their department.
+                if ($current_user_role === 'admin' && $current_user_department_id) {
+                    $stmt = $pdo->prepare("SELECT department_id FROM users WHERE id = ?");
+                    $stmt->execute([$user_id]);
+                    $target_user = $stmt->fetch();
+                    if (!$target_user || $target_user['department_id'] != $current_user_department_id) {
+                        send_json_error(403, 'No tiene permiso para ver los servicios de este usuario.');
+                    }
+                }
+
+                $stmt = $pdo->prepare(
+                    "SELECT s.id as service_id, st.id as site_id, st.name as site_name
+                     FROM services s
+                     JOIN sites st ON s.site_id = st.id
+                     WHERE s.user_id = ?
+                     ORDER BY st.name ASC"
+                );
+                $stmt->execute([$user_id]);
+                $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                foreach ($services as &$service) {
+                    $service['service_id'] = (int)$service['service_id'];
+                    $service['site_id'] = (int)$service['site_id'];
+                }
+
+                echo json_encode(['success' => true, 'data' => $services]);
+            } else {
+                send_json_error(400, 'Acción GET no válida.');
+            }
+            break;
+
+        case 'POST':
+            $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+            if (!verify_csrf_token($csrf_token)) {
+                send_json_error(403, 'Token CSRF inválido.');
+            }
+
+            $input = json_decode(file_get_contents('php://input'), true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                send_json_error(400, 'JSON inválido.');
+            }
+
+            $action = $input['action'] ?? null;
+
+            switch ($action) {
+                case 'add':
+                    $user_id = filter_var($input['user_id'], FILTER_VALIDATE_INT);
+                    $site_id = filter_var($input['site_id'], FILTER_VALIDATE_INT);
+
+                    if (!$user_id || !$site_id) send_json_error(400, 'Usuario y Sitio son requeridos.');
+
+                    // ✅ Security check for admin role
+                    if ($current_user_role === 'admin' && $current_user_department_id) {
+                        $stmt = $pdo->prepare("SELECT department_id FROM users WHERE id = ?");
+                        $stmt->execute([$user_id]);
+                        $target_user = $stmt->fetch();
+                        if (!$target_user || $target_user['department_id'] != $current_user_department_id) {
+                            send_json_error(403, 'No tiene permiso para asignar servicios a este usuario.');
+                        }
+                    }
+
+                    // ✅ Duplicate check
+                    $stmt = $pdo->prepare("SELECT id FROM services WHERE user_id = ? AND site_id = ?");
+                    $stmt->execute([$user_id, $site_id]);
+                    if ($stmt->fetch()) {
+                        send_json_error(409, 'Este sitio ya está asignado a este usuario.');
+                    }
+
+                    $stmt = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
+                    $stmt->execute([$user_id, $site_id]);
+                    echo json_encode(['success' => true, 'message' => 'Servicio asignado.', 'id' => (int)$pdo->lastInsertId()]);
+                    break;
+
+                case 'delete':
+                    $id = filter_var($input['id'], FILTER_VALIDATE_INT);
+                    if (!$id) send_json_error(400, 'ID de servicio no válido.');
+
+                    // ✅ Security check for admin role using a JOIN in the DELETE statement
+                    if ($current_user_role === 'admin' && $current_user_department_id) {
+                        $stmt = $pdo->prepare(
+                            "DELETE s FROM services s
+                             JOIN users u ON s.user_id = u.id
+                             WHERE s.id = ? AND u.department_id = ?"
+                        );
+                        $stmt->execute([$id, $current_user_department_id]);
+                    } else { // Superadmin
+                        $stmt = $pdo->prepare("DELETE FROM services WHERE id = ?");
+                        $stmt->execute([$id]);
+                    }
+
+                    if ($stmt->rowCount() > 0) {
+                        echo json_encode(['success' => true, 'message' => 'Asignación eliminada.']);
+                    } else {
+                        send_json_error(404, 'Asignación no encontrada o sin permisos.');
+                    }
+                    break;
+
+                default:
+                    send_json_error(400, 'Acción POST no válida.');
+            }
+            break;
+
+        default:
+            send_json_error(405, 'Método no permitido.');
+            break;
+    }
+} catch (PDOException $e) {
+    error_log("Error de BD en manage_services.php: " . $e->getMessage());
+    if ($e->getCode() == '23000') { // Integrity constraint violation
+        send_json_error(409, 'No se pudo realizar la operación. Verifique que los datos no estén duplicados.');
+    }
+    send_json_error(500, 'Error de base de datos.');
+} catch (Exception $e) {
+    error_log("Error en manage_services.php: " . $e->getMessage());
+    send_json_error(500, 'Error interno del servidor.');
+}
+
+// Envía el contenido del buffer de salida y termina la ejecución.
 if (ob_get_level()) {
     ob_end_flush();
 }

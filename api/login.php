@@ -1,97 +1,119 @@
 <?php
 /**
  * api/login.php
- * API para iniciar sesión. Devuelve JSON.
+ * Endpoint de la API para la autenticación de usuarios.
+ * Recibe credenciales (usuario y contraseña) a través de una solicitud POST,
+ * las valida contra la base de datos y, si son correctas, inicia una sesión de usuario.
+ * Devuelve una respuesta JSON indicando el éxito y la URL de redirección.
  */
 
-// Asegurar salida limpia
+// Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
     ob_end_clean();
 }
 ob_start();
 
+// Carga el archivo de arranque, que inicia la sesión y carga todas las dependencias y funciones.
 require_once __DIR__ . '/../bootstrap.php';
 
-// Solo POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método no permitido.']);
-    ob_end_flush();
+// Informa al cliente que la respuesta será en formato JSON.
+header('Content-Type: application/json');
+
+// Función de ayuda para estandarizar las respuestas de error.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
     exit;
 }
 
-// Validar CSRF desde el header
+// --- Validación de la Solicitud ---
+
+// 1. Verificar el método HTTP. Este endpoint solo debe aceptar solicitudes POST.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    send_json_error(405, 'Método no permitido.');
+}
+
+// 2. Validar el token CSRF para proteger contra ataques de falsificación de solicitudes.
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido.']);
-    ob_end_flush();
-    exit;
+    send_json_error(403, 'Token CSRF inválido.');
 }
 
-// Leer y validar datos
+// 3. Leer, decodificar y validar los datos de entrada (JSON).
 $input = json_decode(file_get_contents('php://input'), true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    send_json_error(400, 'JSON inválido.');
+}
+
 $username = trim($input['username'] ?? '');
 $password = $input['password'] ?? '';
 
 if (empty($username) || empty($password)) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'Usuario y contraseña son requeridos.']);
-    ob_end_flush();
-    exit;
+    send_json_error(400, 'Usuario y contraseña son requeridos.');
 }
 
+// --- Lógica Principal de Autenticación ---
+
+// El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {
+    // Obtiene una conexión a la base de datos.
     $pdo = get_pdo_connection();
+    
+    // Prepara la consulta para buscar al usuario.
+    // Es crucial incluir `is_active = 1` para prevenir que usuarios desactivados inicien sesión.
     $stmt = $pdo->prepare("
         SELECT 
             id, 
             username, 
             password_hash, 
             role, 
-            company_id, 
+            company_id,
             branch_id,
             department_id
         FROM users 
         WHERE username = ? AND is_active = 1
     ");
     $stmt->execute([$username]);
-    $user = $stmt->fetch();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Verifica si se encontró un usuario y si la contraseña coincide con el hash almacenado.
     if ($user && password_verify($password, $user['password_hash'])) {
-        // Iniciar sesión
+        // Éxito en la autenticación.
+        
+        // 1. Regenerar el ID de sesión para prevenir ataques de fijación de sesión.
         session_regenerate_id(true);
+        
+        // 2. Almacenar los datos del usuario en la sesión.
+        // Estos datos se usarán en toda la aplicación para autorización y personalización.
         $_SESSION['user_id'] = $user['id'];
+        $_SESSION['username'] = $user['username'];
         $_SESSION['user_role'] = $user['role'];
         $_SESSION['company_id'] = $user['company_id'];
         $_SESSION['branch_id'] = $user['branch_id'];
         $_SESSION['department_id'] = $user['department_id'];
-        $_SESSION['username'] = $user['username'];
+        $_SESSION['last_activity'] = time(); // Para gestionar el tiempo de inactividad de la sesión.
 
-        // Decidir redirección
+        // 3. Determinar la página de destino según el rol del usuario.
         $redirect = ($user['role'] === 'superadmin' || $user['role'] === 'admin') 
             ? 'admin.php' 
             : 'panel.php';
 
+        // 4. Enviar la respuesta exitosa al cliente.
         echo json_encode([
             'success' => true,
             'redirect' => $redirect
         ]);
     } else {
-        http_response_code(401);
-        echo json_encode([
-            'success' => false, 
-            'message' => 'Usuario o contraseña incorrectos.'
-        ]);
+        // Fallo en la autenticación (usuario no encontrado, inactivo o contraseña incorrecta).
+        send_json_error(401, 'Usuario o contraseña incorrectos.');
     }
 } catch (Exception $e) {
+    // Si ocurre una excepción, se registra el error y se envía una respuesta genérica.
     error_log("Error en login.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        'success' => false, 
-        'message' => 'Error interno del servidor.'
-    ]);
+    send_json_error(500, 'Error interno del servidor.');
 }
 
+// Envía el contenido del buffer de salida y termina la ejecución del script.
 ob_end_flush();
 exit;

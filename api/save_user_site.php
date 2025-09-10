@@ -1,79 +1,116 @@
 <?php
+/**
+ * api/save_user_site.php
+ * Endpoint para guardar (crear o actualizar) un sitio en la agenda personal del usuario.
+ * Utilizado por el panel de usuario.
+ */
+
+// Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) ob_end_clean();
 ob_start();
 
+// Carga el archivo de arranque y requiere autenticación.
 require_once '../bootstrap.php';
 require_auth();
 
+// Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método no permitido.']);
+// Función de ayuda para estandarizar las respuestas de error.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
     exit;
 }
 
+// --- Validación de la Solicitud ---
+
+// 1. Verificar el método HTTP.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    send_json_error(405, 'Método no permitido.');
+}
+
+// 2. Validar el token CSRF.
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido.']);
-    exit;
+    send_json_error(403, 'Token CSRF inválido.');
 }
 
+// 3. Leer y decodificar el cuerpo de la solicitud JSON.
 $input = json_decode(file_get_contents('php://input'), true);
-$user_id = $_SESSION['user_id'];
-
-$id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
-$name = trim($input['name'] ?? '');
-$url = trim($input['url'] ?? '');
-$username = trim($input['username'] ?? '');
-$password = $input['password'] ?? null;
-$notes = trim($input['notes'] ?? '');
-
-if (empty($name)) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'El nombre del sitio es requerido.']);
-    exit;
+if (json_last_error() !== JSON_ERROR_NONE) {
+    send_json_error(400, 'JSON inválido.');
 }
 
-$encrypted_password = null;
-if (!empty($password)) {
-    $encrypted_password = encrypt_data($password);
-}
-
-$pdo = get_pdo_connection();
-
+// --- Lógica Principal ---
 try {
-    if ($id) { // Editar
+    $pdo = get_pdo_connection();
+    $user_id = $_SESSION['user_id'];
+
+    // 4. Obtener y validar los datos de entrada.
+    $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
+    $name = trim($input['name'] ?? '');
+    $url = trim($input['url'] ?? '');
+    $username = trim($input['username'] ?? '');
+    $password = $input['password'] ?? null; // `null` si no se envía, `string` si se envía.
+    $notes = trim($input['notes'] ?? '');
+
+    if (empty($name)) send_json_error(400, 'El nombre del sitio es requerido.');
+    if (!empty($url) && !filter_var('http://' . preg_replace('#^https?://#', '', $url), FILTER_VALIDATE_URL)) {
+        send_json_error(400, 'La URL proporcionada no es válida.');
+    }
+
+    // 5. Prevenir duplicados: verificar si el usuario ya tiene un sitio con ese nombre.
+    $checkSql = "SELECT id FROM user_sites WHERE name = ? AND user_id = ?";
+    $checkParams = [$name, $user_id];
+    if ($id) { // Si estamos editando, excluimos el ID actual de la comprobación.
+        $checkSql .= " AND id != ?";
+        $checkParams[] = $id;
+    }
+    $stmt = $pdo->prepare($checkSql);
+    $stmt->execute($checkParams);
+    if ($stmt->fetch()) {
+        send_json_error(409, 'Ya tienes un sitio guardado con este nombre.');
+    }
+
+    if ($id) {
+        // --- MODO EDICIÓN ---
         $sql = "UPDATE user_sites SET name = ?, url = ?, username = ?, notes = ?";
         $params = [$name, $url, $username, $notes];
-        
-        if ($encrypted_password !== null) {
+
+        // Solo actualiza la contraseña si se proporcionó en la solicitud.
+        if ($password !== null) {
+            $encrypted_password = !empty($password) ? encrypt_data($password) : null;
             $sql .= ", password_encrypted = ?";
             $params[] = $encrypted_password;
         }
-        
+
         $sql .= " WHERE id = ? AND user_id = ?";
         $params[] = $id;
         $params[] = $user_id;
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
-        echo json_encode(['success' => true, 'message' => 'Sitio actualizado.']);
 
-    } else { // Agregar
-        $stmt = $pdo->prepare(
-            "INSERT INTO user_sites (user_id, name, url, username, password_encrypted, notes) VALUES (?, ?, ?, ?, ?, ?)"
-        );
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(['success' => true, 'message' => 'Sitio actualizado.']);
+        } else {
+            send_json_error(404, 'Sitio no encontrado o sin permisos para editar.');
+        }
+    } else {
+        // --- MODO CREACIÓN ---
+        $encrypted_password = !empty($password) ? encrypt_data($password) : null;
+        $stmt = $pdo->prepare("INSERT INTO user_sites (user_id, name, url, username, password_encrypted, notes) VALUES (?, ?, ?, ?, ?, ?)");
         $stmt->execute([$user_id, $name, $url, $username, $encrypted_password, $notes]);
-        echo json_encode(['success' => true, 'message' => 'Sitio agregado.']);
+        echo json_encode(['success' => true, 'message' => 'Sitio agregado.', 'id' => (int)$pdo->lastInsertId()]);
     }
 } catch (Exception $e) {
     error_log("Error en save_user_site.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error al guardar el sitio.']);
+    send_json_error(500, 'Error interno al guardar el sitio.');
 }
 
+// Envía el contenido del buffer de salida y termina la ejecución.
 if (ob_get_level()) {
     ob_end_flush();
 }

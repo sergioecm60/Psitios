@@ -1,233 +1,164 @@
 <?php
-// api/notifications_api.php
+/**
+ * api/notifications_api.php
+ * Endpoint de la API para gestionar notificaciones.
+ * Permite listar, marcar como leídas y eliminar notificaciones con una lógica de permisos
+ * basada en roles (user, admin, superadmin).
+ */
 
-// Asegurar que no haya salida antes del JSON
+// Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
     ob_end_clean();
 }
 ob_start();
 
-// Cabeceras para API JSON
+// Carga el archivo de arranque y requiere autenticación.
+require_once '../bootstrap.php';
+require_auth();
+
+// Informa al cliente que la respuesta será en formato JSON y no debe ser cacheada.
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 header('Pragma: no-cache');
 header('Expires: 0');
 
-// Iniciar sesión si no está activa
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Validar autenticación
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Usuario no autenticado'
-    ]);
-    ob_end_flush();
+// Función de ayuda para estandarizar las respuestas de error.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
     exit;
 }
 
-// Cargar conexión a la base de datos
-require_once '../bootstrap.php';
-
+// --- Lógica Principal ---
 try {
     $pdo = get_pdo_connection();
-} catch (Exception $e) {
-    error_log("Error de conexión a DB en notifications_api.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error de conexión a la base de datos'
-    ]);
-    ob_end_flush();
-    exit;
-}
+    $method = $_SERVER['REQUEST_METHOD'];
+    $user_id = $_SESSION['user_id'];
+    $user_role = $_SESSION['user_role'] ?? 'user';
+    $department_id = $_SESSION['department_id'] ?? null;
 
-// Validar token CSRF (solo para POST)
-$csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !verify_csrf_token($csrf_token)) {
-    http_response_code(403);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Token CSRF inválido'
-    ]);
-    ob_end_flush();
-    exit;
-}
-
-$input = json_decode(file_get_contents('php://input'), true);
-
-// Manejar métodos HTTP
-switch ($_SERVER['REQUEST_METHOD']) {
-    case 'OPTIONS':
-        http_response_code(200);
-        ob_end_flush();
-        exit;
-
+    switch ($method) {
     case 'GET':
-        try {
-            $user_id = $_SESSION['user_id'];
-            $user_role = $_SESSION['user_role'] ?? 'user';
+        $sql = "SELECT n.id, n.user_id, n.site_id, n.message, n.is_read, n.created_at, n.resolved_at, u.username as sender_username, s.name AS site_name
+                FROM notifications n
+                LEFT JOIN users u ON n.user_id = u.id
+                LEFT JOIN sites s ON n.site_id = s.id";
+        $params = [];
 
-            // ✅ Si es admin, ve todas las notificaciones
-            // ✅ Si es user, solo las suyas
-            if ($user_role === 'admin') {
-                $stmt = $pdo->prepare("
-                    SELECT 
-                        n.id,
-                        n.user_id,
-                        n.site_id,
-                        n.message,
-                        n.is_read,
-                        n.created_at,
-                        n.resolved_at,
-                        u.username as sender_username,
-                        s.name AS site_name
-                    FROM notifications n
-                    LEFT JOIN users u ON n.user_id = u.id
-                    LEFT JOIN sites s ON n.site_id = s.id
-                    ORDER BY n.created_at DESC
-                    LIMIT 50
-                ");
-                $stmt->execute();
-            } else {
-                // Usuario normal: solo sus notificaciones
-                $stmt = $pdo->prepare("
-                    SELECT 
-                        n.id,
-                        n.user_id,
-                        n.site_id,
-                        n.message,
-                        n.is_read,
-                        n.created_at,
-                        n.resolved_at,
-                        s.name AS site_name
-                    FROM notifications n
-                    LEFT JOIN sites s ON n.site_id = s.id
-                    WHERE n.user_id = ?
-                    ORDER BY n.created_at DESC
-                    LIMIT 50
-                ");
-                $stmt->execute([$user_id]);
-            }
-
-            $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-            foreach ($notifications as &$n) {
-                $n['is_read'] = (bool) $n['is_read'];
-                $n['created_at'] = date('c', strtotime($n['created_at']));
-                if ($n['resolved_at']) {
-                    $n['resolved_at'] = date('c', strtotime($n['resolved_at']));
-                }
-                // ✅ Mostrar quién generó la alerta si es admin
-                $n['title'] = $n['site_name'] 
-                    ? ($n['sender_username'] 
-                        ? "Notificación: {$n['site_name']} ({$n['sender_username']})" 
-                        : "Notificación: {$n['site_name']}")
-                    : 'Notificación del sistema';
-            }
-
-            echo json_encode([
-                'success' => true,
-                'notifications' => $notifications,
-                'count' => count($notifications)
-            ], JSON_UNESCAPED_UNICODE);
-
-        } catch (Exception $e) {
-            error_log("Error al obtener notificaciones: " . $e->getMessage());
-            http_response_code(500);
-            echo json_encode([
-                'success' => false,
-                'message' => 'Error al cargar notificaciones'
-            ]);
+        if ($user_role === 'admin' && $department_id) {
+            $sql .= " WHERE u.department_id = ?";
+            $params[] = $department_id;
+        } elseif ($user_role === 'user') {
+            $sql .= " WHERE n.user_id = ?";
+            $params[] = $user_id;
         }
+
+        $sql .= " ORDER BY n.created_at DESC LIMIT 50";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        $notifications = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($notifications as &$n) {
+            $n['id'] = (int)$n['id'];
+            $n['is_read'] = (bool)$n['is_read'];
+            $n['created_at'] = date('c', strtotime($n['created_at']));
+            $n['resolved_at'] = $n['resolved_at'] ? date('c', strtotime($n['resolved_at'])) : null;
+        }
+
+        echo json_encode(['success' => true, 'data' => $notifications]);
         break;
 
     case 'POST':
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'JSON inválido']);
-            break;
-        }
+        $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!verify_csrf_token($csrf_token)) send_json_error(403, 'Token CSRF inválido.');
 
-        if (!isset($input['action'])) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'message' => 'Acción requerida']);
-            break;
-        }
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (json_last_error() !== JSON_ERROR_NONE) send_json_error(400, 'JSON inválido.');
 
-        switch ($input['action']) {
+        $action = $input['action'] ?? null;
+        switch ($action) {
             case 'mark_read':
-                $id = $input['notification_id'] ?? null;
-                if (!$id) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'message' => 'ID requerido']);
-                    break;
+                $id = filter_var($input['notification_id'] ?? null, FILTER_VALIDATE_INT);
+                if (!$id) send_json_error(400, 'ID de notificación requerido.');
+
+                $sql = "UPDATE notifications n ";
+                $params = [];
+                if ($user_role === 'admin' && $department_id) {
+                    $sql .= "JOIN users u ON n.user_id = u.id SET n.is_read = 1 WHERE n.id = ? AND u.department_id = ?";
+                    $params = [$id, $department_id];
+                } elseif ($user_role === 'user') {
+                    $sql .= "SET is_read = 1 WHERE n.id = ? AND n.user_id = ?";
+                    $params = [$id, $user_id];
+                } else { // superadmin
+                    $sql .= "SET is_read = 1 WHERE n.id = ?";
+                    $params = [$id];
                 }
-                try {
-                    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE id = ?");
-                    $stmt->execute([(int)$id]);
-                    echo json_encode(['success' => true, 'message' => 'Marcada como leída']);
-                } catch (Exception $e) {
-                    error_log("Error al marcar como leída: " . $e->getMessage());
-                    http_response_code(500);
-                    echo json_encode(['success' => false, 'message' => 'Error interno']);
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                if ($stmt->rowCount() > 0) {
+                    echo json_encode(['success' => true, 'message' => 'Marcada como leída.']);
+                } else {
+                    send_json_error(404, 'Notificación no encontrada o sin permisos.');
                 }
                 break;
 
             case 'mark_all_read':
-                try {
-                    $stmt = $pdo->prepare("UPDATE notifications SET is_read = 1 WHERE is_read = 0");
-                    $stmt->execute();
-                    $count = $stmt->rowCount();
-                    echo json_encode([
-                        'success' => true,
-                        'message' => $count > 0 ? "Marcadas $count como leídas" : "No había notificaciones sin leer"
-                    ]);
-                } catch (Exception $e) {
-                    error_log("Error al marcar todas como leídas: " . $e->getMessage());
-                    http_response_code(500);
-                    echo json_encode(['success' => false, 'message' => 'Error interno']);
+                $sql = "UPDATE notifications n ";
+                $params = [];
+                if ($user_role === 'admin' && $department_id) {
+                    $sql .= "JOIN users u ON n.user_id = u.id SET n.is_read = 1 WHERE n.is_read = 0 AND u.department_id = ?";
+                    $params = [$department_id];
+                } elseif ($user_role === 'user') {
+                    $sql .= "SET is_read = 1 WHERE n.is_read = 0 AND n.user_id = ?";
+                    $params = [$user_id];
+                } else { // superadmin
+                    $sql .= "SET is_read = 1 WHERE n.is_read = 0";
                 }
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                echo json_encode(['success' => true, 'message' => "{$stmt->rowCount()} notificaciones marcadas como leídas."]);
                 break;
 
             case 'delete':
-                $id = $input['notification_id'] ?? null;
-                if (!$id) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'message' => 'ID requerido']);
-                    break;
+                $id = filter_var($input['notification_id'] ?? null, FILTER_VALIDATE_INT);
+                if (!$id) send_json_error(400, 'ID de notificación requerido.');
+
+                $sql = "DELETE n FROM notifications n ";
+                $params = [];
+                if ($user_role === 'admin' && $department_id) {
+                    $sql .= "JOIN users u ON n.user_id = u.id WHERE n.id = ? AND u.department_id = ?";
+                    $params = [$id, $department_id];
+                } elseif ($user_role === 'user') {
+                    $sql .= "WHERE n.id = ? AND n.user_id = ?";
+                    $params = [$id, $user_id];
+                } else { // superadmin
+                    $sql .= "WHERE n.id = ?";
+                    $params = [$id];
                 }
-                try {
-                    $stmt = $pdo->prepare("DELETE FROM notifications WHERE id = ?");
-                    $stmt->execute([(int)$id]);
-                    if ($stmt->rowCount() > 0) {
-                        echo json_encode(['success' => true, 'message' => 'Notificación eliminada']);
-                    } else {
-                        http_response_code(404);
-                        echo json_encode(['success' => false, 'message' => 'No encontrada']);
-                    }
-                } catch (Exception $e) {
-                    error_log("Error al eliminar notificación: " . $e->getMessage());
-                    http_response_code(500);
-                    echo json_encode(['success' => false, 'message' => 'Error interno']);
+                $stmt = $pdo->prepare($sql);
+                $stmt->execute($params);
+                if ($stmt->rowCount() > 0) {
+                    echo json_encode(['success' => true, 'message' => 'Notificación eliminada.']);
+                } else {
+                    send_json_error(404, 'Notificación no encontrada o sin permisos.');
                 }
                 break;
 
             default:
-                http_response_code(400);
-                echo json_encode(['success' => false, 'message' => 'Acción no válida']);
+                send_json_error(400, 'Acción no válida.');
         }
         break;
 
     default:
-        http_response_code(405);
-        echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+        send_json_error(405, 'Método no permitido.');
+}
+} catch (Exception $e) {
+    error_log("Error en notifications_api.php: " . $e->getMessage());
+    send_json_error(500, 'Error interno del servidor.');
 }
 
-// Limpiar buffer de salida
+// Envía el contenido del buffer de salida y termina la ejecución.
 if (ob_get_level()) {
     ob_end_flush();
 }

@@ -109,7 +109,7 @@ class NotificationManager {
             }
             
             if (data.success) {
-                this.updateNotificationDisplay(data.notifications);
+                this.updateNotificationDisplay(data.data);
                 this.retryCount = 0;
                 this.hideError();
                 const retryBtn = document.getElementById('retry-btn');
