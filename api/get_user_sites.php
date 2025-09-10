@@ -33,11 +33,8 @@ try {
         SELECT 
             svc.id as service_id, 
             s.id as site_id, 
-            s.name, 
-            s.url, 
-            s.username, 
+            s.name,
             s.password_needs_update, 
-            s.notes, 
             s.password_encrypted IS NOT NULL as has_password
         FROM sites s
         JOIN services svc ON s.id = svc.site_id

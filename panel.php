@@ -92,11 +92,9 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                         <thead>
                             <tr>
                                 <th></th>
-                                <th>Tipo</th>
+                                <th title="Tipo">Tipo</th>
                                 <th>Título</th>
-                                <th>Usuario</th>
                                 <th>Contraseña</th>
-                                <th>Nota</th>
                                 <th>Recordatorio</th>
                                 <th>Acciones</th>
                             </tr>

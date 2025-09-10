@@ -222,13 +222,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.dataset.id = item.id; // Asignar ID para notificaciones
                 tr.innerHTML = `
                     <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed == 1 ? 'checked' : ''}></td>
-                    <td>${item.type === 'credential' ? '🔑' : '📝'}</td>
+                    <td title="${item.type === 'credential' ? 'Credencial' : 'Nota'}">${item.type === 'credential' ? '🔑' : '📝'}</td>
                     <td>${window.escapeHTML(item.title)}</td>
-                    <td>${window.escapeHTML(item.username || '')}</td> 
                     <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-type="reminder">Mostrar</button>` : ''}</td>
-                    <td>${window.escapeHTML(item.notes || '')}</td>
                     <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString() : ''}</td>
-                    <td><button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
+                    <td><button class="btn btn-sm btn-secondary edit-reminder" data-id="${item.id}">Editar</button>
+                        <button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
                 `;
                 agendaTableBody.appendChild(tr);
             });
@@ -320,6 +319,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await window.api.post(endpoint, body);
                 if (result.success) {
                     credsDiv.innerHTML = `
+                        ${result.data.url ? `<p><strong>🌐 URL:</strong> <a href="${result.data.url.startsWith('http') ? result.data.url : 'http://' + result.data.url}" target="_blank" rel="noopener noreferrer">${window.escapeHTML(result.data.url)}</a></p>` : ''}
                         <p><strong>👤 Usuario:</strong> 
                            <span>${window.escapeHTML(result.data.username)}</span> 
                            <button class="btn-copy" data-copy="${window.escapeHTML(result.data.username)}">📋</button>
@@ -328,6 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
                            <span>${window.escapeHTML(result.data.password)}</span> 
                            <button class="btn-copy" data-copy="${window.escapeHTML(result.data.password)}">📋</button>
                         </p>
+                        ${result.data.notes ? `<div class="notes"><strong>📝 Notas:</strong><br>${window.escapeHTML(result.data.notes)}</div>` : ''}
                     `;
                 } else {
                     credsDiv.innerHTML = `<p class="error">❌ ${result.message || 'No se pudieron obtener las credenciales.'}</p>`;
@@ -364,16 +365,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const editSiteBtn = e.target.closest('.btn-edit-site');
         if (editSiteBtn) {
             const id = editSiteBtn.dataset.id;
-            const form = document.getElementById('user-site-form');
-            
-            // Mostrar un estado de carga antes de abrir el modal
-            form.reset();
-            document.getElementById('user-site-modal-title').textContent = 'Cargando...';
-            openModal('user-site-modal');
-
-            // Llamar al nuevo endpoint de detalles
-            const result = await window.api.get(`api/get_user_site_details.php?id=${id}`);
-
+            const result = await window.api.get(`api/get_user_sites_personal.php?id=${id}`);
             if (result.success) {
                 const site = result.data;
                 const form = document.getElementById('user-site-form');
@@ -384,9 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('user-site-url').value = site.url;
                 document.getElementById('user-site-username').value = site.username;
                 document.getElementById('user-site-notes').value = site.notes;
-            } else {
-                alert('Error al cargar los detalles del sitio: ' + result.message);
-                closeModal('user-site-modal');
+                openModal('user-site-modal');
             }
         }
 
@@ -407,6 +397,67 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 7.6. Listeners para la tabla de Agenda
     agendaTableBody?.addEventListener('click', async (e) => {
+        // Botón "Mostrar" contraseña
+        const decryptBtn = e.target.closest('.decrypt-pass');
+        if (decryptBtn) {
+            const id = decryptBtn.dataset.id;
+            const result = await window.api.post('api/decrypt_user_data.php', { id: id, type: 'reminder' });
+                if (result.success) {
+                alert(`Usuario: ${result.data.username}\nContraseña: ${result.data.password}`);
+                } else {
+                alert('Error: ' + result.message);
+                }
+        }
+
+        // Botón "Eliminar" recordatorio
+        const deleteBtn = e.target.closest('.delete-reminder');
+        if (deleteBtn) {
+            if (!confirm('¿Eliminar este recordatorio?')) return;
+            const id = deleteBtn.dataset.id;
+            const result = await window.api.post('api/delete_user_reminder.php', { id });
+            if (result.success) {
+                loadAgenda();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        // Checkbox "Completado"
+        const completeCheck = e.target.closest('.complete-reminder');
+        if (completeCheck) {
+            const id = completeCheck.dataset.id;
+            await window.api.post('api/save_user_reminder.php', {
+                action: 'toggle_complete',
+                id: id
+            });
+        }
+    });
+
+    // 7.6. Listeners para la tabla de Agenda
+    agendaTableBody?.addEventListener('click', async (e) => {
+        // Botón "Editar" recordatorio
+        const editBtn = e.target.closest('.edit-reminder');
+        if (editBtn) {
+            const id = editBtn.dataset.id;
+            const result = await window.api.get(`api/get_user_reminder_details.php?id=${id}`);
+            if (result.success) {
+                const reminder = result.data;
+                const form = document.getElementById('reminder-form');
+                form.reset();
+                document.getElementById('reminder-modal-title').textContent = 'Editar Recordatorio';
+                document.getElementById('reminder-id').value = reminder.id;
+                document.getElementById('reminder-type').value = reminder.type;
+                document.getElementById('reminder-title').value = reminder.title;
+                document.getElementById('reminder-username').value = reminder.username || '';
+                document.getElementById('reminder-notes').value = reminder.notes || '';
+                document.getElementById('reminder-datetime').value = reminder.reminder_datetime ? reminder.reminder_datetime.substring(0, 16) : '';
+                toggleCredentialFields();
+                openModal('reminder-modal');
+            } else {
+                alert('Error al cargar los detalles del recordatorio: ' + result.message);
+            }
+        }
+
         // Botón "Mostrar" contraseña
         const decryptBtn = e.target.closest('.decrypt-pass');
         if (decryptBtn) {
