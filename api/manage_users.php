@@ -12,50 +12,35 @@ if (ob_get_level()) {
 ob_start();
 
 require_once __DIR__ . '/../bootstrap.php';
-// ✅ MEJORA DE SEGURIDAD:  Solo los administradores pueden gestionar usuarios.
-// En este caso no queremos que un superadmin cree otro superadmin por accidente
-// Por lo que require_auth('admin') es suficiente y el superadmin también podrá gestionar
-// a través de este endpoint
-
-require_auth('admin');
+require_auth('admin'); // Permite 'admin' y 'superadmin'
 header('Content-Type: application/json');
 
-$method = $_SERVER['REQUEST_METHOD'];
-$pdo = get_pdo_connection();
-
-// Validar CSRF
-// ✅ Seguridad:  Validar CSRF para evitar ataques.
-$csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
-if ($method === 'POST' && !verify_csrf_token($csrf_token)) {
-    // ✅ Código de estado HTTP 403:  Para prohibido.
-    http_response_code(403);
-    // ✅ Respuesta JSON:  Para indicar el fallo.
-    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido.']);
-    ob_end_flush();
+// Función de ayuda para estandarizar las respuestas de error.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
     exit;
 }
 
 try {
+    $pdo = get_pdo_connection();
+    $method = $_SERVER['REQUEST_METHOD'];
+
     switch ($method) {
         case 'GET':
-            // ✅ Acción:  Obtener un usuario.
             $action = $_GET['action'] ?? null;
-            // ✅ ID:  del usuario
             $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 
-            // ✅ Acción: Listar usuarios
             if ($action === 'list') {
-                // ✅ Rol: del usuario solicitante
                 $user_role = $_SESSION['user_role'] ?? 'user';
-                // ✅ Query base: la misma query para admin y superadmin
+                // BUG FIX: Se eliminaron los comentarios (//) de dentro del string SQL.
                 $base_query = "
                     SELECT u.id, u.username, u.role, u.is_active, u.created_at, u.department_id,
                            c.name as company_name, b.name as branch_name, b.province, d.name as department_name
                     FROM users u
                     LEFT JOIN companies c ON u.company_id = c.id
-                    // ✅ Joins: de las diferentes tablas
                     LEFT JOIN branches b ON u.branch_id = b.id
-                    // ✅ Join: tabla departamentos
                     LEFT JOIN departments d ON u.department_id = d.id";
 
                 if ($user_role === 'admin' && !empty($_SESSION['department_id'])) {
@@ -76,36 +61,26 @@ try {
 
                 // ✅ Imprimir resultado
                 echo json_encode(['success' => true, 'data' => $users]);
-                // ✅ Acción: Obtener usuario por id
             } elseif ($action === 'get' && $id) {
-                // ✅ Rol: del usuario solicitante
                 $user_role = $_SESSION['user_role'] ?? 'user';
-                // ✅ Query:
                 $sql = "
                     SELECT 
                         id, username, role, is_active, company_id, branch_id, department_id, assigned_admin_id
                     FROM users 
                     WHERE id = ?";
-                // ✅ Parametros:
                 $params = [$id];
 
-                // ✅ MEJORA DE SEGURIDAD: Un admin solo puede ver usuarios de su departamento.
+                // Seguridad: Un admin solo puede ver usuarios de su departamento.
                 if ($user_role === 'admin' && !empty($_SESSION['department_id'])) {
-                    // ✅ Query: solo del departamento del admin
                     $sql .= " AND department_id = ?";
                     $params[] = $_SESSION['department_id'];
                 }
 
-                // ✅ Ejecutar query
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 $user = $stmt->fetch(PDO::FETCH_ASSOC);
                 if (!$user) {
-                    http_response_code(404);
-                    echo json_encode(['success' => false, 'message' => 'Usuario no encontrado']);
-                    ob_end_flush();
-                    exit;
-                    // ✅ Tipos:
+                    send_json_error(404, 'Usuario no encontrado o sin permisos.');
                 }
                 $user['is_active'] = (bool)$user['is_active'];
                 $user['id'] = (int)$user['id'];
