@@ -1,5 +1,13 @@
-/* /Psitios/assets/css/main.css */
+/**
+ * /Psitios/assets/css/main.css
+ *
+ * Hoja de estilos global para la aplicación Psitios.
+ * Contiene los estilos base, variables de color y componentes compartidos
+ * que se utilizan en múltiples páginas (login, paneles, etc.).
+ * Los estilos más específicos de cada panel se encuentran en panel.css y admin.css.
+ */
 
+/* --- 1. GLOBAL & THEME --- */
 :root {
     --primary-color: #007bff;
     --secondary-color: #6c757d;
@@ -24,20 +32,10 @@ body {
     line-height: 1.6;
 }
 
+/* --- 2. LAYOUT & SHARED COMPONENTS --- */
 .container {
     max-width: 1200px;
     margin: 20px auto;
-    padding: 20px;
-    background-color: var(--card-background);
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-/* --- Header & Navigation --- */
-.admin-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 20px;
     padding-bottom: 15px;
     border-bottom: 1px solid var(--border-color);
@@ -48,22 +46,7 @@ body {
     color: var(--dark-color);
 }
 
-.btn-logout {
-    background-color: var(--danger-color);
-    color: white;
-    padding: 8px 15px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    text-decoration: none;
-    transition: background-color 0.3s ease;
-}
-
-.btn-logout:hover {
-    background-color: #c82333;
-}
-
-/* --- Buttons --- */
+/* 2.1. Buttons */
 .btn-primary, .btn-secondary, .btn-danger, .btn-info {
     padding: 10px 15px;
     border: none;
@@ -110,7 +93,18 @@ body {
     background-color: #138496;
 }
 
-/* --- Table Styles --- */
+.btn-logout {
+    background-color: var(--danger-color);
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+/* 2.2. Tables (Generic) */
 .table-container {
     overflow-x: auto;
     margin-top: 20px;
@@ -143,7 +137,7 @@ table tbody tr:hover {
     background-color: #e9ecef;
 }
 
-/* --- Form Styles --- */
+/* 2.3. Forms (Generic) */
 .form-group {
     margin-bottom: 15px;
 }
@@ -183,7 +177,7 @@ table tbody tr:hover {
     margin: 0;
 }
 
-/* --- Modals --- */
+/* 2.4. Modals (Generic) */
 .modal {
     display: none;
     position: fixed;
@@ -205,10 +199,10 @@ table tbody tr:hover {
 .modal-content {
     background-color: var(--card-background);
     margin: auto;
-    padding: 30px;
+    padding: 20px 30px 30px;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    width: 90%;
+    width: 95%;
     max-width: 600px;
     position: relative;
 }
@@ -229,7 +223,7 @@ table tbody tr:hover {
     text-decoration: none;
 }
 
-.modal-content h3 {
+.modal-header h2, .modal-content h3 {
     margin-top: 0;
     margin-bottom: 20px;
     color: var(--dark-color);
@@ -237,7 +231,7 @@ table tbody tr:hover {
     padding-bottom: 10px;
 }
 
-/* --- Messages & Status --- */
+/* 2.5. Messages & Status Indicators */
 .error-message {
     color: var(--danger-color);
     background-color: #f8d7da;
@@ -266,7 +260,19 @@ table tbody tr:hover {
     font-weight: bold;
 }
 
-/* --- Specific Components --- */
+/* --- 3. PAGE-SPECIFIC STYLES --- */
+
+/* 3.1. Login Page (index.php) */
+.login-page {
+    background: linear-gradient(135deg, #010016 0%, #010004 50%, #2c5364 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Centra el contenido verticalmente */
+    align-items: center; /* Centra el contenido horizontalmente */
+}
+
+/* Lista de servicios (posiblemente obsoleta o para un uso específico) */
 .services-view-list {
     padding: 10px;
     background-color: #f9f9f9;
@@ -286,7 +292,7 @@ table tbody tr:hover {
     margin-bottom: 8px;
 }
 
-/* Toggle Switch Styles */
+/* 3.2. Footer (Global) */
 .switch {
     position: relative;
     display: inline-block;
@@ -342,7 +348,7 @@ input:checked + .slider:before {
     border-radius: 50%;
 }
 
-/* --- Panel.php: Diseño moderno --- */
+/* --- 4. PANEL COMPONENTS (panel.php) --- */
 .services-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -397,7 +403,7 @@ input:checked + .slider:before {
     background-color: #218838;
 }
 
-/* Botonera compacta */
+/* Botonera de acciones en las tarjetas de servicio */
 .credentials-area {
     display: flex;
     flex-wrap: wrap;
@@ -448,7 +454,7 @@ input:checked + .slider:before {
     background-color: #c82333;
 }
 
-/* Área de credenciales */
+/* Área para mostrar credenciales desencriptadas */
 .creds-display {
     background-color: var(--light-color);
     border: 1px dashed var(--border-color);
@@ -467,7 +473,7 @@ input:checked + .slider:before {
     justify-content: space-between;
 }
 
-/* Notificación de actualización */
+/* Notificación genérica (puede usarse en varios lugares) */
 .notification {
     background-color: #fff3cd;
     border: 1px solid #ffe69c;
@@ -480,7 +486,7 @@ input:checked + .slider:before {
     font-weight: 500;
 }
 
-/* Botón de copiar */
+/* Botón pequeño para copiar texto */
 .btn-copy {
     margin-left: 10px;
     padding: 2px 6px;
@@ -497,7 +503,7 @@ input:checked + .slider:before {
     background-color: var(--dark-color);
 }
 
-/* Barra de scroll personalizada */
+/* Barra de scroll personalizada para la grilla de servicios */
 .services-grid::-webkit-scrollbar {
     width: 6px;
 }
@@ -567,7 +573,6 @@ input:checked + .slider:before {
     text-align: center;
 }
 
-/* --- Footer --- */
 .footer {
     margin-top: auto;
     padding: 20px;
@@ -601,7 +606,7 @@ input:checked + .slider:before {
 }
 
 .footer-whatsapp-link span {
-    /* Ocultar el número por defecto con una transición suave */
+    /* Ocultar el número por defecto para un look más limpio */
     opacity: 0;
     max-width: 0;
     overflow: hidden;
@@ -610,7 +615,7 @@ input:checked + .slider:before {
 }
 
 .footer-whatsapp-link:hover span {
-    /* Mostrar el número al pasar el mouse */
+    /* Mostrar el número al pasar el cursor sobre el ícono */
     opacity: 1;
     max-width: 150px; /* Ancho suficiente para el número */
 }
@@ -620,42 +625,11 @@ input:checked + .slider:before {
     height: 20px;
 }
 
-/* --- Tabs for Admin Panel --- */
-.admin-tabs {
-    border-bottom: 1px solid var(--border-color);
-    margin-bottom: 2rem;
-}
+/* --- 5. UTILITIES & MISC --- */
 
-.tab-link {
-    background-color: transparent;
-    border: none;
-    padding: 1rem 1.5rem;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--secondary-color);
-    border-bottom: 3px solid transparent;
-    transition: color 0.2s, border-color 0.2s;
-}
-
-.tab-link:hover {
-    color: var(--primary-color);
-}
-
-.tab-link.active {
-    color: var(--primary-color);
-    border-bottom-color: var(--primary-color);
-}
-
-.admin-tab-content {
-    display: none;
-}
-
-.admin-tab-content.active {
-    display: block;
-}
-
-/* --- Notificaciones --- */
+/* 5.1. Notificaciones (Componente de campana, posiblemente obsoleto o para futuro uso) */
+/* NOTA: La mayoría de los estilos de notificaciones están en `notifications_panel.css`
+   y `panel.css`. Estas reglas parecen ser para un componente de "campana" diferente. */
 .notification-area {
     position: relative;
     display: inline-block;
@@ -758,7 +732,7 @@ input:checked + .slider:before {
     text-align: center;
 }
 
-/* --- Utility Classes --- */
+/* 5.2. Clases de Utilidad */
 .hidden {
     display: none !important;
 }

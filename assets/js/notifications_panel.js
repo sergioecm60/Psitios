@@ -1,33 +1,56 @@
+/**
+ * /Psitios/assets/js/notifications_panel.js
+ * 
+ * Gestiona la lógica del panel de notificaciones.
+ * Esta clase se encarga de obtener, mostrar y actualizar las notificaciones de forma periódica,
+ * así como de manejar las interacciones del usuario (marcar como leída, eliminar, etc.).
+ */
 class NotificationManager {
+    /**
+     * @param {number} [fetchIntervalMs=30000] - Intervalo en milisegundos para buscar nuevas notificaciones.
+     */
     constructor() {
+        // --- Estado Interno ---
         this.isLoading = false;
         this.retryCount = 0;
         this.maxRetries = 3;
         this.retryDelay = 5000;
         this.fetchInterval = null;
-        
+        this.fetchIntervalMs = 30000; // 30 segundos
+
+        // --- Dependencias del DOM ---
         const csrfMeta = document.querySelector('meta[name="csrf-token"]');
         this.csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
-        
+
+        // Iniciar el gestor
         this.init();
     }
 
+    /**
+     * Inicializa el gestor de notificaciones.
+     * Realiza la primera carga y configura el polling y los event listeners.
+     */
     init() {
         this.fetchNotifications();
-        
+
         this.fetchInterval = setInterval(() => {
             this.fetchNotifications();
-        }, 30000);
-        
+        }, this.fetchIntervalMs);
+
+        // Limpia el intervalo cuando el usuario abandona la página para evitar ejecuciones en segundo plano.
         window.addEventListener('beforeunload', () => {
             if (this.fetchInterval) {
                 clearInterval(this.fetchInterval);
             }
         });
-        
+
         this.setupEventListeners();
     }
 
+    /**
+     * Configura los listeners para los botones estáticos y el contenedor de notificaciones.
+     * Utiliza delegación de eventos en el contenedor para manejar los botones dinámicos.
+     */
     setupEventListeners() {
         const markAllBtn = document.getElementById('mark-all-btn');
         if (markAllBtn) {
@@ -38,7 +61,8 @@ class NotificationManager {
         if (retryBtn) {
             retryBtn.addEventListener('click', () => this.retry());
         }
-        
+
+        // Delegación de eventos para los botones dentro de cada notificación.
         const container = document.getElementById('notification-container');
         if (container) {
             container.addEventListener('click', (event) => {
@@ -51,7 +75,6 @@ class NotificationManager {
                     }
                 }
 
-                // ✅ Detectar clic en botón de eliminar
                 const deleteBtn = event.target.closest('.delete-notification-btn');
                 if (deleteBtn) {
                     event.preventDefault();
@@ -61,7 +84,6 @@ class NotificationManager {
                     }
                 }
 
-                // ✅ Detectar clic en botón "Resuelto"
                 const resolveBtn = event.target.closest('.resolve-btn');
                 if (resolveBtn) {
                     event.preventDefault();
@@ -74,10 +96,14 @@ class NotificationManager {
         }
     }
 
+    /**
+     * Obtiene las notificaciones desde la API.
+     * Maneja el estado de carga y la lógica de reintentos en caso de error.
+     */
     async fetchNotifications() {
         if (this.isLoading) return;
 
-        console.log('🔄 Fetching notifications...');
+        // console.log('🔄 Fetching notifications...'); // Descomentar para depuración
         this.isLoading = true;
 
         try {
@@ -126,9 +152,13 @@ class NotificationManager {
         }
     }
 
+    /**
+     * Maneja los errores de la API, implementando una estrategia de reintentos.
+     * @param {Error} error - El objeto de error capturado.
+     */
     handleError(error) {
         this.retryCount++;
-        
+
         if (this.retryCount >= this.maxRetries) {
             if (this.fetchInterval) {
                 clearInterval(this.fetchInterval);
@@ -146,18 +176,22 @@ class NotificationManager {
         }
     }
 
+    /**
+     * Actualiza la interfaz de usuario con las notificaciones recibidas.
+     * @param {Array<object>} notifications - Un array de objetos de notificación.
+     */
     updateNotificationDisplay(notifications) {
         const container = document.getElementById('notification-container');
         const badge = document.getElementById('notification-badge');
         const markAllBtn = document.getElementById('mark-all-btn');
-        
+
         if (!container) return;
 
         const unreadCount = notifications.filter(n => !n.is_read).length;
-        
+
         if (badge) {
             badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
-            badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+            badge.style.display = unreadCount > 0 ? 'flex' : 'none'; // Usar flex para centrar mejor
         }
 
         if (markAllBtn) {
@@ -180,167 +214,110 @@ class NotificationManager {
                         ${notification.site_name ? `<span class="notification-site">🌐 ${this.escapeHtml(notification.site_name)}</span>` : ''}
                         ${isResolved 
                             ? `<span class="notification-resolved">✅ Resuelto: ${this.formatTime(notification.resolved_at)}</span>` 
-                            : `<button class="resolve-btn" data-id="${notification.id}" style="background: #28a745; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">✅ Resuelto</button>`
+                            : `<button class="btn-action resolve-btn" data-id="${notification.id}">✅ Resuelto</button>`
                         }
                     </div>
                     ${!notification.is_read && !isResolved ? `<button class="mark-read-btn" data-id="${notification.id}">✓ Marcar como leída</button>` : ''}
-                    <button class="delete-notification-btn" data-id="${notification.id}" style="float: right; background: #dc3545; color: white; border: none; padding: 2px 6px; border-radius: 3px; font-size: 0.8rem; margin-left: 5px;">🗑️</button>
+                    <button class="btn-action delete-notification-btn" data-id="${notification.id}">🗑️</button>
                 </div>
             `;
         }).join('');
     }
 
-    // ✅ Nueva función: Eliminar notificación
+    /**
+     * Centraliza las llamadas POST a la API para acciones de notificación.
+     * @param {string} endpoint - La URL de la API.
+     * @param {string} action - La acción a realizar (ej. 'delete', 'mark_read').
+     * @param {object} data - Datos adicionales para enviar en el cuerpo.
+     * @returns {Promise<object>} - La respuesta JSON de la API.
+     */
+    async _apiAction(endpoint, action, data = {}) {
+        const requestBody = { action, ...data };
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        };
+        if (this.csrfToken) {
+            headers['X-CSRF-TOKEN'] = this.csrfToken;
+        }
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: headers,
+            credentials: 'same-origin',
+            body: JSON.stringify(requestBody)
+        });
+
+        return response.json();
+    }
+
+    /**
+     * Elimina una notificación.
+     * @param {number} notificationId - El ID de la notificación a eliminar.
+     */
     async deleteNotification(notificationId) {
         if (!confirm('¿Eliminar esta notificación?')) return;
-
-        try {
-            const requestBody = {
-                action: 'delete',
-                notification_id: notificationId
-            };
-
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            };
-
-            if (this.csrfToken) {
-                headers['X-CSRF-TOKEN'] = this.csrfToken;
-            }
-
-            const response = await fetch('api/notifications_api.php', {
-                method: 'POST',
-                headers: headers,
-                credentials: 'same-origin',
-                body: JSON.stringify(requestBody)
-            });
-
-            const data = await response.json();
-            
-            if (data.success) {
-                this.showSuccess('Notificación eliminada');
-                this.fetchNotifications();
-            } else {
-                this.showError('Error: ' + data.message);
-            }
-        } catch (error) {
-            this.showError('Error al eliminar la notificación');
-        }
+        this.handleApiResponse(
+            this._apiAction('api/notifications_api.php', 'delete', { notification_id: notificationId }),
+            'Notificación eliminada'
+        );
     }
 
-    // ✅ Nueva función: Marcar como leída
+    /**
+     * Marca una notificación específica como leída.
+     * @param {number} notificationId - El ID de la notificación.
+     */
     async markAsRead(notificationId) {
-        try {
-            const requestBody = {
-                action: 'mark_read',
-                notification_id: notificationId
-            };
-
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            };
-
-            if (this.csrfToken) {
-                headers['X-CSRF-TOKEN'] = this.csrfToken;
-            }
-
-            const response = await fetch('api/notifications_api.php', {
-                method: 'POST',
-                headers: headers,
-                credentials: 'same-origin',
-                body: JSON.stringify(requestBody)
-            });
-
-            const data = await response.json();
-            
-            if (data.success) {
-                this.showSuccess('Notificación marcada como leída');
-                this.fetchNotifications();
-            } else {
-                this.showError('Error: ' + data.message);
-            }
-        } catch (error) {
-            this.showError('Error al marcar como leída');
-        }
+        this.handleApiResponse(
+            this._apiAction('api/notifications_api.php', 'mark_read', { notification_id: notificationId }),
+            'Notificación marcada como leída'
+        );
     }
 
-    // ✅ Nueva función: Marcar todas como leídas
+    /**
+     * Marca todas las notificaciones no leídas como leídas.
+     */
     async markAllAsRead() {
-        try {
-            const requestBody = {
-                action: 'mark_all_read'
-            };
-
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            };
-
-            if (this.csrfToken) {
-                headers['X-CSRF-TOKEN'] = this.csrfToken;
-            }
-
-            const response = await fetch('api/notifications_api.php', {
-                method: 'POST',
-                headers: headers,
-                credentials: 'same-origin',
-                body: JSON.stringify(requestBody)
-            });
-
-            const data = await response.json();
-            
-            if (data.success) {
-                this.showSuccess(data.message || 'Todas las notificaciones marcadas como leídas');
-                this.fetchNotifications();
-            } else {
-                this.showError('Error: ' + data.message);
-            }
-        } catch (error) {
-            this.showError('Error al marcar todas como leídas');
-        }
+        this.handleApiResponse(
+            this._apiAction('api/notifications_api.php', 'mark_all_read'),
+            'Todas las notificaciones marcadas como leídas'
+        );
     }
 
-    // ✅ Nueva función: Resolver notificación
+    /**
+     * Marca una notificación como resuelta.
+     * @param {number} notificationId - El ID de la notificación a resolver.
+     */
     async resolveNotification(notificationId) {
-        if (!confirm('¿Marcar esta notificación como resuelta?')) return;
+        this.handleApiResponse(
+            this._apiAction('api/resolve_notification.php', 'resolve', { notification_id: notificationId }),
+            'Notificación resuelta y servicio actualizado'
+        );
+    }
 
+    /**
+     * Maneja la respuesta de una promesa de API, mostrando éxito o error.
+     * @param {Promise<object>} apiPromise - La promesa devuelta por la llamada a la API.
+     * @param {string} successMessage - El mensaje a mostrar si la operación tiene éxito.
+     */
+    async handleApiResponse(apiPromise, successMessage) {
         try {
-            const requestBody = {
-                action: 'resolve',
-                notification_id: notificationId
-            };
-
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest'
-            };
-
-            if (this.csrfToken) {
-                headers['X-CSRF-TOKEN'] = this.csrfToken;
-            }
-
-            const response = await fetch('api/resolve_notification.php', {
-                method: 'POST',
-                headers: headers,
-                credentials: 'same-origin',
-                body: JSON.stringify(requestBody)
-            });
-
-            const data = await response.json();
-            
-            if (data.success) {
-                this.showSuccess('Notificación resuelta y servicio actualizado.');
-                this.fetchNotifications(); // Refrescar
+            const result = await apiPromise;
+            if (result.success) {
+                this.showSuccess(result.message || successMessage);
+                this.fetchNotifications(); // Refrescar la lista
             } else {
-                this.showError('Error: ' + data.message);
+                this.showError(result.message || 'Ocurrió un error desconocido.');
             }
         } catch (error) {
-            this.showError('Error al marcar como resuelto');
+            this.showError('Error de conexión o respuesta inválida del servidor.');
+            console.error('API Action Error:', error);
         }
     }
 
+    // --- Métodos de UI (Helpers) ---
+
+    /** Muestra un mensaje de error temporal. */
     showError(message) {
         const errorDiv = document.getElementById('notification-error');
         if (errorDiv) {
@@ -350,6 +327,7 @@ class NotificationManager {
         }
     }
 
+    /** Muestra un mensaje de éxito temporal. */
     showSuccess(message) {
         const successDiv = document.getElementById('notification-success');
         if (successDiv) {
@@ -359,15 +337,19 @@ class NotificationManager {
         }
     }
 
+    /** Oculta el mensaje de error. */
     hideError() {
         const errorDiv = document.getElementById('notification-error');
         if (errorDiv) errorDiv.style.display = 'none';
     }
 
+    /**
+     * Reinicia el contador de reintentos y fuerza una nueva búsqueda de notificaciones.
+     */
     retry() {
         this.retryCount = 0;
         if (!this.fetchInterval) {
-            this.fetchInterval = setInterval(() => this.fetchNotifications(), 30000);
+            this.fetchInterval = setInterval(() => this.fetchNotifications(), this.fetchIntervalMs);
         }
         const retryBtn = document.getElementById('retry-btn');
         if (retryBtn) retryBtn.style.display = 'none';
@@ -375,12 +357,16 @@ class NotificationManager {
     }
 
     escapeHtml(text) {
+        // NOTA: Esta función es un candidato ideal para un archivo de utilidades global (utils.js)
+        // para evitar duplicación entre admin.js, panel.js, etc.
         const div = document.createElement('div');
         div.textContent = text || '';
         return div.innerHTML;
     }
 
     formatTime(timestamp) {
+        // NOTA: Esta función también es un buen candidato para un archivo de utilidades global.
+        if (!timestamp) return '';
         const date = new Date(timestamp);
         const now = new Date();
         const diffMs = now - date;
@@ -406,6 +392,6 @@ class NotificationManager {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🚀 Initializing Notification Manager...');
+    // console.log('🚀 Initializing Notification Manager...'); // Descomentar para depuración
     window.notificationManager = new NotificationManager();
 });

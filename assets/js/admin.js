@@ -1,22 +1,40 @@
-// --- Global Functions ---
-// Moved outside DOMContentLoaded for consistency and global accessibility.
+/**
+ * /Psitios/assets/js/admin.js
+ * 
+ * Lógica principal para el panel de administración (admin.php).
+ * Este script maneja la interacción del usuario con las pestañas, modales,
+ * y realiza todas las operaciones CRUD (Crear, Leer, Actualizar, Eliminar)
+ * a través de llamadas a la API.
+ */
+
+// --- 1. FUNCIONES GLOBALES DE UI ---
+// Estas funciones se mantienen en el ámbito global para poder ser llamadas
+// desde cualquier parte, aunque su uso directo en HTML (onclick) se ha minimizado.
+
+/**
+ * Abre un modal por su ID.
+ * @param {string} modalId - El ID del elemento modal a mostrar.
+ */
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.classList.add('active');
+        modal.classList.add('active'); // La clase 'active' controla la visibilidad.
     }
 }
 
-// This function remains global to be accessible by `onclick` attributes in the HTML.
+/**
+ * Cierra un modal por su ID.
+ * @param {string} modalId - El ID del elemento modal a ocultar.
+ */
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.remove('active');
     }
 }
-
 document.addEventListener('DOMContentLoaded', function() {
-    // Leer datos pasados desde PHP a través de atributos data-* en la etiqueta body
+    // --- 2. CONFIGURACIÓN GLOBAL Y CONSTANTES ---
+    // Leemos datos importantes pasados desde PHP a través de atributos data-* en la etiqueta <body>.
     const adminData = document.body.dataset;
     const CSRF_TOKEN = adminData.csrfToken;
     const CURRENT_USER_ROLE = adminData.userRole;
@@ -24,37 +42,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const CURRENT_USER_BRANCH_ID = adminData.branchId;
     const CURRENT_USER_DEPARTMENT_ID = adminData.departmentId;
 
-    const tabs = document.querySelectorAll('.tab-link');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            tabs.forEach(t => t.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            tab.classList.add('active');
-            document.getElementById(tab.dataset.tab).classList.add('active');
-        });
-    });
+    // --- 3. FUNCIONES AUXILIARES ---
 
-    document.querySelectorAll('.close-btn').forEach(btn => {
-        btn.addEventListener('click', () => closeModal(btn.dataset.modalId));
-    });
-    window.addEventListener('click', (event) => {
-        if (event.target.classList.contains('modal')) {
-            closeModal(event.target.id);
-        }
-    });
-
-    // Manejar botones de cancelar en modales para evitar 'onclick' en línea
-    document.querySelectorAll('.close-modal-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const modalId = btn.dataset.modalId;
-            if (modalId) {
-                closeModal(modalId);
-            }
-        });
-    });
-
+    /**
+     * Función centralizada para realizar todas las llamadas a la API.
+     * Maneja la configuración de headers (incluyendo CSRF), el cuerpo de la petición,
+     * y un robusto control de errores para respuestas no-JSON, errores de red, etc.
+     * @param {string} url - El endpoint de la API.
+     * @param {string} [method='GET'] - Método HTTP (GET, POST, etc.).
+     * @param {object|null} [body=null] - El cuerpo de la petición para POST/PUT.
+     * @returns {Promise<object|null>} - La respuesta JSON del servidor o null si hay un error.
+     */
     async function apiCall(url, method = 'GET', body = null) {
         const options = {
             method,
@@ -70,11 +68,13 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch(url, options);
             const text = await response.text();
-            
-            if (!text || text.trim() === '') {
-                throw new Error(`Respuesta vacía del servidor (Estado: ${response.status})`);
-            }
 
+            // Maneja respuestas vacías que pueden ser válidas (ej. 204 No Content) pero que romperían JSON.parse.
+            if (!text || text.trim() === '') {
+                if (!response.ok)
+                throw new Error(`Respuesta vacía del servidor (Estado: ${response.status})`);
+                return { success: true, message: 'Operación completada con éxito.' }; // Asumir éxito si la respuesta es OK pero vacía.
+            }
             let data;
             try {
                 data = JSON.parse(text);
@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error('Respuesta del servidor no es JSON válido: ' + text.substring(0, 100));
             }
 
+            // Si la respuesta no fue exitosa (ej. status 400, 403, 500), lanza un error con el mensaje del servidor.
             if (!response.ok) {
                 let errorMessage = data.message || `Error ${response.status}`;
                 if (data.error) {
@@ -99,6 +100,11 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    /**
+     * Formatea una cadena de fecha (ej. '2023-10-27 10:30:00') a un formato legible en español.
+     * @param {string|null} dateString - La fecha a formatear.
+     * @returns {string} - La fecha formateada o un texto indicativo si es inválida/nula.
+     */
     function safeDate(dateString) {
         if (!dateString) return 'No especificado';
         const date = new Date(dateString);
@@ -113,18 +119,22 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
+    /**
+     * Escapa caracteres HTML de una cadena para prevenir ataques XSS.
+     * Utiliza `textContent` para una sanitización segura y recomendada.
+     * @param {*} unsafe - El valor a escapar.
+     * @returns {string} - La cadena segura.
+     */
     function escapeHtml(unsafe) {
         if (unsafe === null || typeof unsafe === 'undefined') return '';
-        return unsafe
-             .toString()
-             .replace(/&/g, "&amp;")
-             .replace(/</g, "&lt;")
-             .replace(/>/g, "&gt;")
-             .replace(/"/g, "&quot;")
-             .replace(/'/g, "&#039;");
+        const div = document.createElement('div');
+        div.textContent = String(unsafe);
+        return div.innerHTML;
     }
 
-    // --- USUARIOS ---
+    // --- 4. GESTIÓN DE USUARIOS (PESTAÑA POR DEFECTO) ---
+
+    // 4.1. Elementos del DOM
     const usersTableBody = document.querySelector('#users-table-body');
     const userForm = document.getElementById('user-form');
 
@@ -135,6 +145,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // 4.2. Renderizado de la tabla de usuarios
     function renderUsersTable(users) {
         usersTableBody.innerHTML = '';
         if (users.length === 0) {
@@ -143,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         users.forEach(user => {
             const tr = document.createElement('tr');
-
+            // Muestra 'Global' para superadmin o 'N/A' si no hay datos, para mayor claridad.
             const companyName = user.company_name || (user.role === 'superadmin' ? 'Global' : 'N/A');
             const branchName = user.branch_name || (user.role === 'superadmin' ? 'Global' : 'N/A');
             const province = user.province || (user.role === 'superadmin' ? 'Global' : 'N/A');
@@ -170,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // 4.3. Event Listeners (Agregar, Editar, Eliminar)
     document.getElementById('add-user-btn').addEventListener('click', async () => {
         userForm.reset();
         document.getElementById('user-id').value = '';
@@ -177,7 +189,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('user-modal-title').textContent = 'Agregar Usuario';
         document.getElementById('is_active').checked = true;
 
-        // Reset and enable dropdowns for the 'add' form
+        // Resetea y habilita los desplegables para el formulario de 'agregar'.
         document.getElementById('company_id').disabled = false;
         document.getElementById('branch_id').disabled = false;
         document.getElementById('department_id').disabled = false;
@@ -186,18 +198,18 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('branch_id').innerHTML = '<option value="">Seleccione una empresa primero</option>';
         document.getElementById('department_id').innerHTML = '<option value="">Seleccione una sucursal primero</option>';
 
-        // Start loading non-critical data in parallel
+        // Inicia la carga de datos no críticos en paralelo para mejorar la percepción de velocidad.
         const sitesPromise = loadSitesForUser();
 
         if (CURRENT_USER_ROLE === 'admin') {
-            // For admin, load their specific hierarchy and disable the selects
+            // Para un 'admin', carga su jerarquía específica y deshabilita los desplegables.
             await loadCompanies(CURRENT_USER_COMPANY_ID);
             await loadBranches(CURRENT_USER_COMPANY_ID, CURRENT_USER_BRANCH_ID, CURRENT_USER_DEPARTMENT_ID);
             document.getElementById('company_id').disabled = true;
             document.getElementById('branch_id').disabled = true;
             document.getElementById('department_id').disabled = true;
         } else {
-            // For superadmin, just load all companies and let them choose
+            // Para un 'superadmin', carga todas las empresas para que pueda elegir.
             await loadCompanies();
             const adminGroup = document.getElementById('admin-assignment-group');
             if (CURRENT_USER_ROLE === 'superadmin' && document.getElementById('role').value === 'user') {
@@ -208,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        await sitesPromise; // Ensure sites are loaded before showing modal
+        await sitesPromise; // Espera a que los sitios se carguen antes de mostrar el modal.
         openModal('user-modal');
     });
 
@@ -266,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // 4.4. Manejador del formulario de usuario (submit)
     userForm.addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -301,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- CARGAR ADMINISTRADORES ---
+    // 4.5. Funciones auxiliares para el formulario de usuario
     async function loadAdmins(selectedId = null) {
         const select = document.getElementById('assigned_admin_id');
         if (!select) return;
@@ -330,7 +343,7 @@ document.addEventListener('DOMContentLoaded', function() {
         adminGroup.style.display = (CURRENT_USER_ROLE === 'superadmin' && this.value === 'user') ? 'block' : 'none';
     });
 
-    // --- CARGA DE EMPRESAS Y SUCURSALES ---
+    // 4.6. Carga de desplegables jerárquicos (Empresas, Sucursales, Departamentos)
     async function loadCompanies(selectedId = null) {
         const companySelect = document.getElementById('company_id');
         if (!companySelect) return;
@@ -352,12 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // This function loads ALL departments and is generally not what's needed in the user form.
-    // It's kept for other potential uses but `loadDepartmentsByBranch` is preferred.
-    async function loadAllDepartments(selectedId = null) {
-        // ... implementation if needed ...
-    }
-
 
     const companySelect = document.getElementById('company_id');
     if (companySelect) {
@@ -372,7 +379,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const departmentSelect = document.getElementById('department_id');
         if (!branchSelect || !departmentSelect) return;
 
-        departmentSelect.innerHTML = '<option value="">Seleccione una sucursal</option>'; // Reset
+        departmentSelect.innerHTML = '<option value="">Seleccione una sucursal</option>'; // Resetea el de departamentos
 
         // Handle case where no company is selected
         if (!companyId) {
@@ -469,7 +476,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- EMPRESAS ---
+    // --- 5. GESTIÓN DE EMPRESAS ---
     const companiesTableBody = document.querySelector('#companies-table-body');
     const companyFormEl = document.getElementById('company-form');
 
@@ -552,7 +559,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- SUCURSALES ---
+    // --- 6. GESTIÓN DE SUCURSALES ---
     const branchesTableBody = document.querySelector('#branches-table-body');
     const branchFormEl = document.getElementById('branch-form');
 
@@ -592,8 +599,8 @@ document.addEventListener('DOMContentLoaded', function() {
         branchFormEl.reset();
         document.getElementById('branch-id').value = '';
         document.getElementById('branch-action').value = 'add';
-        document.getElementById('branch-modal-title').textContent = 'Agregar Sucursal';
-        loadBranchCompanies();
+        document.getElementById('branch-modal-title').textContent = 'Agregar Sucursal';        
+        loadCompaniesGeneric(document.getElementById('branch-company-id'));
         loadCountries();
         openModal('branch-modal');
     });
@@ -620,7 +627,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('branch-action').value = 'edit';
                 document.getElementById('branch-id').value = result.data.id;
                 document.getElementById('branch-name').value = result.data.name;
-                await loadBranchCompanies(result.data.company_id);
+                await loadCompaniesGeneric(document.getElementById('branch-company-id'), result.data.company_id);
                 await loadCountries(result.data.country_id, result.data.province);
                 openModal('branch-modal');
             }
@@ -638,10 +645,6 @@ document.addEventListener('DOMContentLoaded', function() {
             fetchBranches();
         }
     });
-
-    async function loadBranchCompanies(selectedId = null) {
-        await loadCompaniesGeneric(document.getElementById('branch-company-id'), selectedId);
-    }
 
     async function loadCountries(selectedCountryId = null, selectedProvinceName = null) {
         const countrySelect = document.getElementById('branch-country-id');
@@ -691,7 +694,7 @@ document.addEventListener('DOMContentLoaded', function() {
         loadProvinces(this.value);
     });
 
-    // --- DEPARTAMENTOS ---
+    // --- 7. GESTIÓN DE DEPARTAMENTOS ---
     const departmentsTableBody = document.querySelector('#departments-table-body');
     const departmentForm = document.getElementById('department-form');
 
@@ -731,7 +734,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('department-id').value = '';
         document.getElementById('department-action').value = 'add'; 
         document.getElementById('department-modal-title').textContent = 'Agregar Departamento';
-        loadDepartmentCompanies();
+        loadCompaniesGeneric(document.getElementById('department-company-id'));
         document.getElementById('department-branch-id').innerHTML = '<option value="">Seleccionar sucursal</option>';
         openModal('department-modal');
     });
@@ -748,8 +751,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('department-action').value = 'edit';
                 document.getElementById('department-modal-title').textContent = 'Editar Departamento';
                 document.getElementById('department-name').value = dept.name;
-                await loadDepartmentCompanies(dept.company_id);
-                await loadDepartmentBranches(dept.company_id, dept.branch_id);
+                await loadCompaniesGeneric(document.getElementById('department-company-id'), dept.company_id);
+                await loadBranchesGeneric(document.getElementById('department-branch-id'), dept.company_id, dept.branch_id);
                 openModal('department-modal');
             }
         }
@@ -774,22 +777,18 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result && result.success) {
             closeModal('department-modal');
             fetchDepartments();
-            // No need to call loadDepartments() here, it's not used in the form.
         }
     });
 
-    async function loadDepartmentCompanies(selectedId = null) {
-        await loadCompaniesGeneric(document.getElementById('department-company-id'), selectedId);
-    }
-
-    async function loadDepartmentBranches(companyId, selectedId = null) {
-        await loadBranchesGeneric(document.getElementById('department-branch-id'), companyId, selectedId);
-    }
-
     document.getElementById('department-company-id')?.addEventListener('change', function() {
-        loadDepartmentBranches(this.value);
+        loadBranchesGeneric(document.getElementById('department-branch-id'), this.value);
     });
 
+    /**
+     * Función genérica para cargar empresas en cualquier elemento <select>.
+     * @param {HTMLSelectElement} selectElement - El elemento select a poblar.
+     * @param {string|number|null} [selectedId=null] - El ID de la empresa a preseleccionar.
+     */
     async function loadCompaniesGeneric(selectElement, selectedId = null) {
         if (!selectElement) return;
         selectElement.innerHTML = '<option value="">Cargando...</option>';
@@ -808,6 +807,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    /**
+     * Función genérica para cargar sucursales de una empresa en un <select>.
+     * @param {HTMLSelectElement} selectElement - El elemento select a poblar.
+     * @param {string|number} companyId - El ID de la empresa de la que cargar sucursales.
+     * @param {string|number|null} [selectedId=null] - El ID de la sucursal a preseleccionar.
+     */
     async function loadBranchesGeneric(selectElement, companyId, selectedId = null) {
         if (!selectElement) return;
         if (!companyId) {
@@ -830,7 +835,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- SITIOS ---
+    // --- 8. GESTIÓN DE SITIOS ---
     const sitesTableBody = document.querySelector('#sites-table-body');
     const siteForm = document.getElementById('site-form');
 
@@ -920,7 +925,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- MENSAJES ---
+    // Toggle para mostrar/ocultar contraseña en el modal de sitios
+    siteForm?.addEventListener('click', e => {
+        if (e.target.classList.contains('toggle-password')) {
+            const passwordInput = e.target.previousElementSibling;
+            if (passwordInput && passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                e.target.textContent = 'Ocultar';
+            } else if (passwordInput && passwordInput.type === 'text') {
+                passwordInput.type = 'password';
+                e.target.textContent = 'Mostrar';
+            }
+        }
+    });
+
+    // --- 9. GESTIÓN DE MENSAJES ---
     const messagesTableBody = document.getElementById('messages-table-body');
     document.querySelector('[data-tab="messages-tab"]')?.addEventListener('click', fetchUserMessages);
 
@@ -983,7 +1002,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- AUDITORÍA ---
+    // --- 10. GESTIÓN DE AUDITORÍA ---
     const auditTableBody = document.getElementById('audit-table-body');
 
     async function fetchAuditLogs() {
@@ -1019,22 +1038,48 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    document.querySelector('[data-tab="audit-tab"]')?.addEventListener('click', fetchAuditLogs);
+    // --- 11. LÓGICA DE UI (PESTAÑAS Y MODALES) ---
+    const tabNav = document.querySelector('.tab-nav');
+    
+    // Manejo de pestañas con delegación de eventos para mayor eficiencia.
+    tabNav?.addEventListener('click', (e) => {
+        const tab = e.target.closest('.tab-link');
+        if (!tab) return;
 
-    // --- INICIALIZACIÓN ---
-    fetchUsers();
-    if (CURRENT_USER_ROLE === 'superadmin') {
-        fetchSites();
-        fetchCompanies();
-        fetchBranches();
-        fetchDepartments();
+        tabNav.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+        tab.classList.add('active');
+        const tabContentId = tab.dataset.tab;
+        const tabContent = document.getElementById(tabContentId);
+        if (tabContent) {
+            tabContent.classList.add('active');
+        }
+        
+        // Carga el contenido de la pestaña dinámicamente si es necesario.
+        handleTabClick(tabContentId);
+    });
+
+    // Carga el contenido de ciertas pestañas solo cuando se hace clic en ellas por primera vez.
+    const loadedTabs = new Set(); // Para no recargar en cada clic.
+    function handleTabClick(tabId) {
+        if (loadedTabs.has(tabId)) return;
+
+        switch(tabId) {
+            case 'audit-tab': fetchAuditLogs(); break;
+            case 'messages-tab': fetchUserMessages(); break;
+        }
+        loadedTabs.add(tabId);
     }
 
-    // --- Selector de Tema ---
+    // --- 12. GESTIÓN DE TEMA (THEME) ---
     const themeSelect = document.getElementById('theme-select');
 
+    /**
+     * Carga el tema guardado en localStorage o el tema por defecto del usuario desde la BD.
+     */
     function loadSavedTheme() {
-        const savedTheme = localStorage.getItem('userTheme') || 'light';
+        const savedTheme = localStorage.getItem('userTheme') || adminData.theme || 'light';
         document.body.setAttribute('data-theme', savedTheme);
         if (themeSelect) themeSelect.value = savedTheme;
     }
@@ -1055,5 +1100,38 @@ document.addEventListener('DOMContentLoaded', function() {
         setTheme(e.target.value);
     });
 
-    loadSavedTheme();
+    // --- 13. INICIALIZACIÓN ---
+    
+    /**
+     * Función principal que se ejecuta al cargar el DOM.
+     * Configura los listeners y carga los datos iniciales.
+     */
+    function init() {
+        // Configurar listeners para cerrar modales
+        document.querySelectorAll('.close-btn').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(btn.dataset.modalId));
+        });
+        document.querySelectorAll('.close-modal-btn').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(btn.dataset.modalId));
+        });
+        window.addEventListener('click', (event) => {
+            if (event.target.classList.contains('modal')) {
+                closeModal(event.target.id);
+            }
+        });
+
+        // Cargar datos iniciales
+        fetchUsers(); // La pestaña de usuarios es la principal
+        if (CURRENT_USER_ROLE === 'superadmin') {
+            // Para superadmin, cargamos todo al inicio ya que tiene acceso a todo.
+            fetchSites();
+            fetchCompanies();
+            fetchBranches();
+            fetchDepartments();
+        }
+
+        loadSavedTheme();
+    }
+
+    init();
 });

@@ -1,110 +1,121 @@
-// --- Global Functions for Modals ---
-// These need to be global to be called by `onclick` attributes in the HTML.
+/**
+ * /Psitios/assets/js/panel.js
+ * 
+ * Lógica principal para el panel de usuario (panel.php).
+ * Este script maneja las pestañas de "Mis Sitios" y "Mi Agenda", la funcionalidad de chat,
+ * los modales para agregar/editar contenido y las notificaciones de recordatorios.
+ */
+
+// --- 1. FUNCIONES GLOBALES DE UI ---
+// Se mantienen en el ámbito global para ser accesibles desde cualquier parte.
+
+/**
+ * Abre un modal por su ID.
+ * @param {string} modalId - El ID del elemento modal a mostrar.
+ */
 function openModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.classList.add('active'); // Use class for display
+        modal.classList.add('active');
     }
 }
 
+/**
+ * Cierra un modal por su ID.
+ * @param {string} modalId - El ID del elemento modal a ocultar.
+ */
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
-        modal.classList.remove('active'); // Use class for display
+        modal.classList.remove('active');
     }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // --- 2. CONFIGURACIÓN Y ESTADO ---
+    // Elementos del DOM y datos iniciales
     const csrfToken = document.getElementById('csrf_token')?.value;
     const adminId = document.getElementById('admin_id')?.value;
     const userId = document.getElementById('user_id')?.value;
+
+    // Elementos del Chat
     const chatModal = document.getElementById('chat-modal');
     const chatToggleBtn = document.getElementById('chat-toggle-btn');
     const chatMessages = document.getElementById('chat-messages');
     const chatForm = document.getElementById('chat-form');
     const chatInput = document.getElementById('chat-input');
 
-    // ✅ Función apiCall definida para resolver el ReferenceError
+    // Elementos de la Agenda
+    const agendaTableBody = document.querySelector('#agenda-table tbody');
+    const reminderModal = document.getElementById('reminder-modal');
+    const reminderForm = document.getElementById('reminder-form');
+    const reminderTypeSelect = document.getElementById('reminder-type');
+
+    // Estado de la aplicación
+    let chatPollingInterval = null;
+    let notifiedReminders = new Set(); // Para evitar notificaciones duplicadas
+
+    // --- 3. HELPERS (Funciones de Ayuda) ---
+
+    /**
+     * Función centralizada para realizar todas las llamadas a la API.
+     * Utiliza la versión robusta para manejar errores de red, no-JSON, etc.
+     * @param {string} url - El endpoint de la API.
+     * @param {string} [method='GET'] - Método HTTP.
+     * @param {object|null} [body=null] - Cuerpo de la petición.
+     * @returns {Promise<object>} - La respuesta JSON del servidor.
+     */
     async function apiCall(url, method = 'GET', body = null) {
         const options = {
             method,
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': csrfToken
-            }
+            },
         };
         if (body) options.body = JSON.stringify(body);
-        const response = await fetch(url, options);
-        return response.json();
-    }
 
-    // --- LÓGICA DE PESTAÑAS COMPLETAMENTE SEPARADAS ---
-    const tabs = document.querySelectorAll('.tab-link');
-    const tabContents = document.querySelectorAll('.tab-content');
-    
-    function showTab(tabId) {
-        // Ocultar todas las pestañas
-        tabs.forEach(t => t.classList.remove('active'));
-        tabContents.forEach(c => c.classList.remove('active'));
-        
-        // Mostrar la pestaña seleccionada
-        const activeTab = document.querySelector(`[data-tab="${tabId}"]`);
-        const activeTabContent = document.getElementById(tabId);
-        
-        if (activeTab) activeTab.classList.add('active');
-        if (activeTabContent) activeTabContent.classList.add('active');
-        
-        // Cargar el contenido específico de esa pestaña
-        loadTabContent(tabId);
-    }
-    
-    function loadTabContent(tabId) {
-        switch (tabId) {
-            case 'sites-tab':
-                // Solo cargar sitios cuando se accede a la pestaña de sitios
-                fetchAdminSites();
-                fetchUserSites();
-                break;
-            case 'agenda-tab':
-                // Solo cargar agenda cuando se accede a la pestaña de agenda
-                loadAgenda();
-                break;
+        try {
+            const response = await fetch(url, options);
+            const text = await response.text();
+
+            if (!text || text.trim() === '') {
+                if (!response.ok) throw new Error(`Respuesta vacía del servidor (Estado: ${response.status})`);
+                return { success: true, message: 'Operación completada.' };
+            }
+
+            const data = JSON.parse(text);
+            if (!response.ok) {
+                throw new Error(data.message || `Error del servidor: ${response.status}`);
+            }
+            return data;
+        } catch (error) {
+            console.error('💥 API Call Error:', error);
+            // Devuelve un objeto de error consistente para que el resto del código pueda manejarlo.
+            return { success: false, message: error.message };
         }
     }
 
-    // Event listeners para las pestañas
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            const tabId = tab.dataset.tab;
-            showTab(tabId);
-        });
-    });
+    /**
+     * Maneja la respuesta de una promesa de API, mostrando una alerta y/o recargando datos.
+     * @param {Promise<object>} apiPromise - La promesa devuelta por la llamada a la API.
+     * @param {object} options - Opciones para manejar la respuesta.
+     * @param {string} [options.successMessage] - Mensaje de éxito.
+     * @param {Function} [options.onSuccess] - Callback a ejecutar en caso de éxito.
+     */
+    async function handleApiResponse(apiPromise, { successMessage, onSuccess }) {
+        const result = await apiPromise;
+        if (result.success) {
+            if (successMessage) alert(successMessage);
+            if (onSuccess) onSuccess();
+        } else {
+            alert('Error: ' + (result.message || 'Ocurrió un error desconocido.'));
+        }
+    }
 
-    // Manejar botones de cancelar en modales para evitar 'onclick' en línea
-    document.querySelectorAll('.close-modal-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const modalId = btn.dataset.modalId;
-            if (modalId) {
-                closeModal(modalId);
-            }
-        });
-    });
+    // --- 4. LÓGICA DE CHAT ---
 
-    // --- CHAT FUNCTIONALITY ---
-    chatToggleBtn?.addEventListener('click', () => openModal('chat-modal'));
-
-    document.querySelectorAll('.close-button').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const modalId = btn.dataset.modalId;
-            if (modalId) closeModal(modalId);
-        });
-    });
-
-    window.addEventListener('click', e => {
-        if (e.target.classList.contains('modal')) e.target.classList.remove('active');
-    });
-
-    // Enviar mensaje
+    /** Maneja el envío de un nuevo mensaje de chat. */
     chatForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const text = chatInput.value.trim();
@@ -115,47 +126,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        try {
-            const response = await fetch('api/send_message.php', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': csrfToken
-                },
-                body: JSON.stringify({
-                    message: text,
-                    receiver_id: adminId
-                })
-            });
- 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
-            }
-
-            const result = await response.json();
-            if (result.success) {
-                chatInput.value = '';
-                fetchChatMessages();
-            } else {
-                alert('Error: ' + result.message);
-            }
-        } catch (error) {
-            alert('Error de conexión: ' + error.message);
-        }
+        handleApiResponse(
+            apiCall('api/send_message.php', 'POST', { message: text, receiver_id: adminId }),
+            { onSuccess: () => { chatInput.value = ''; fetchChatMessages(); } }
+        );
     });
 
-    // Cargar mensajes
+    /** Obtiene y renderiza los mensajes del chat. */
     async function fetchChatMessages() {
         try {
-            const response = await fetch('api/get_messages.php');
- 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
-            }
-
-            const data = await response.json();
+            const data = await apiCall('api/get_messages.php');
             if (data.success) {
                 chatMessages.innerHTML = data.messages.map(msg => {
                     const isSent = msg.sender_id == userId;
@@ -174,34 +154,36 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Polling cada 10 segundos
-    setInterval(fetchChatMessages, 10000);
-    chatToggleBtn?.addEventListener('click', () => setTimeout(fetchChatMessages, 500));
+    /** Inicia el polling para actualizar el chat solo si el modal está abierto. */
+    function startChatPolling() {
+        if (chatPollingInterval) clearInterval(chatPollingInterval);
+        fetchChatMessages(); // Carga inmediata
+        chatPollingInterval = setInterval(fetchChatMessages, 10000); // Polling cada 10s
+    }
 
-    // Eliminar mensaje
+    /** Detiene el polling del chat. */
+    function stopChatPolling() {
+        if (chatPollingInterval) clearInterval(chatPollingInterval);
+        chatPollingInterval = null;
+    }
+
+    /** Maneja la eliminación de un mensaje de chat. */
     chatMessages?.addEventListener('click', async (e) => {
         const deleteBtn = e.target.closest('.delete-msg-btn');
         if (deleteBtn && confirm('¿Eliminar este mensaje?')) {
             const id = deleteBtn.dataset.id;
-            try {
-                const response = await fetch('api/delete_user_message.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ message_id: id })
-                }); 
-                const result = await response.json();
-                if (result.success) {
-                    fetchChatMessages();
-                } else {
-                    alert('No se pudo eliminar: ' + result.message);
-                }
-            } catch (error) {
-                alert('Error de conexión.');
-            }
+            handleApiResponse(
+                apiCall('api/delete_user_message.php', 'POST', { message_id: id }),
+                { onSuccess: fetchChatMessages }
+            );
         }
     });
 
-    // --- FUNCIONES PARA LA PESTAÑA DE SITIOS ---
+    // --- 5. LÓGICA DE LA PESTAÑA "MIS SITIOS" ---
+
+    /**
+     * Obtiene y renderiza los sitios asignados por el administrador.
+     */
     async function fetchAdminSites() {
         const grid = document.getElementById('admin-sites-grid');
         if (!grid) return;
@@ -220,6 +202,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    /**
+     * Obtiene y renderiza los sitios personales del usuario.
+     */
     async function fetchUserSites() {
         const grid = document.getElementById('user-sites-grid');
         if (!grid) return;
@@ -238,6 +223,13 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    /**
+     * Crea el HTML para una tarjeta de servicio (sitio).
+     * @param {object} item - El objeto del sitio/servicio.
+     * @param {boolean} isAssigned - True si es un sitio asignado por el admin.
+     * @param {boolean} [isPersonal=false] - True si es un sitio personal del usuario.
+     * @returns {string} - El HTML de la tarjeta.
+     */
     function createServiceCard(item, isAssigned, isPersonal = false) {
         const id = isAssigned ? item.service_id : item.id;
         const siteId = isAssigned ? item.site_id : item.id;
@@ -260,12 +252,9 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
     }
 
-    // --- FUNCIONES PARA LA PESTAÑA DE AGENDA ---
-    const agendaTableBody = document.querySelector('#agenda-table tbody');
-    const reminderModal = document.getElementById('reminder-modal');
-    const reminderForm = document.getElementById('reminder-form');
-    const reminderTypeSelect = document.getElementById('reminder-type');
+    // --- 6. LÓGICA DE LA PESTAÑA "MI AGENDA" ---
 
+    /** Obtiene y renderiza la tabla de la agenda. */
     async function loadAgenda() {
         if (!agendaTableBody) return;
         agendaTableBody.innerHTML = '<tr><td colspan="8" class="loading">Cargando agenda...</td></tr>';
@@ -296,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // --- EVENT LISTENERS ESPECÍFICOS PARA SITIOS ---
+    // 6.1. Event Listeners de la Agenda
     document.getElementById('add-user-site-btn')?.addEventListener('click', () => {
         const form = document.getElementById('user-site-form');
         form.reset();
@@ -309,17 +298,14 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-        const result = await apiCall('api/save_user_site.php', 'POST', data);
-        if (result.success) {
-            closeModal('user-site-modal');
-            fetchUserSites(); // Recargar solo los sitios personales
-        } else {
-            alert('Error: ' + result.message);
-        }
+        handleApiResponse(
+            apiCall('api/save_user_site.php', 'POST', data),
+            { onSuccess: () => { closeModal('user-site-modal'); fetchUserSites(); } }
+        );
     });
 
-    // --- EVENT LISTENERS ESPECÍFICOS PARA AGENDA ---
     document.getElementById('add-reminder-btn')?.addEventListener('click', () => {
+        const reminderForm = document.getElementById('reminder-form');
         reminderForm.reset();
         document.getElementById('reminder-id').value = '';
         document.getElementById('reminder-modal-title').textContent = 'Añadir Recordatorio';
@@ -327,6 +313,7 @@ document.addEventListener('DOMContentLoaded', function() {
         openModal('reminder-modal');
     });
 
+    /** Muestra u oculta los campos de credenciales en el modal de agenda. */
     function toggleCredentialFields() {
         const type = reminderTypeSelect?.value;
         const fields = reminderModal?.querySelectorAll('.credential-field');
@@ -341,18 +328,16 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-        const result = await apiCall('api/save_user_reminder.php', 'POST', data);
-        if (result.success) {
-            closeModal('reminder-modal');
-            loadAgenda(); // Recargar solo la agenda
-        } else {
-            alert('Error: ' + result.message);
-        }
+        handleApiResponse(
+            apiCall('api/save_user_reminder.php', 'POST', data),
+            { onSuccess: () => { closeModal('reminder-modal'); loadAgenda(); } }
+        );
     });
 
-    // --- EVENT LISTENERS GENERALES PARA BOTONES DINÁMICOS ---
+    // --- 7. MANEJADORES DE EVENTOS DELEGADOS ---
+    // Un solo listener en el contenedor principal para manejar clics en botones dinámicos.
     document.querySelector('.container').addEventListener('click', async (e) => {
-        // Manejar botones de sitios (Ver credenciales, Notificar, Reportar, etc.)
+        // 7.1. Botón "Ver Credenciales" (Sitios)
         const viewBtn = e.target.closest('.btn-view-creds');
         if (viewBtn) {
             const serviceId = viewBtn.dataset.id;
@@ -372,19 +357,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const endpoint = type === 'personal' ? 'api/decrypt_user_data.php' : 'api/get_credentials.php';
             const body = type === 'personal' ? { id: serviceId, type: 'site' } : { id: serviceId };
 
-            try {
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify(body)
-                });
-
-                if (!response.ok) { 
-                    const errorText = await response.text();
-                    throw new Error(`Error ${response.status}: ${errorText}`);
-                }
-
-                const result = await response.json();
+            const result = await apiCall(endpoint, 'POST', body);
                 if (result.success) {
                     credsDiv.innerHTML = `
                         <p><strong>👤 Usuario:</strong> 
@@ -397,67 +370,33 @@ document.addEventListener('DOMContentLoaded', function() {
                         </p>
                     `;
                 } else {
-                    throw new Error(result.message || 'No se pudieron obtener las credenciales.');
+                    credsDiv.innerHTML = `<p class="error">❌ ${result.message || 'No se pudieron obtener las credenciales.'}</p>`;
                 }
-            } catch (error) {
-                credsDiv.innerHTML = `<p class="error">❌ ${error.message}</p>`;
-            }
         }
 
-        // Resto de botones de sitios...
+        // 7.2. Botón "Notificar Expiración" (Sitios)
         const notifyBtn = e.target.closest('.btn-notify-expired');
         if (notifyBtn) {
             if (!confirm('¿Contraseña expirada? Se notificará al admin.')) return;
             notifyBtn.disabled = true;
-
-            try {
-                const response = await fetch('api/notify_expiration.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ id: notifyBtn.dataset.id })
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert('✅ Notificado.');
-                    const card = notifyBtn.closest('.service-card');
-                    if (card && !card.querySelector('.notification')) {
-                        const notification = document.createElement('p');
-                        notification.className = 'notification';
-                        notification.textContent = '⚠️ Pendiente de actualización';
-                        card.insertBefore(notification, card.querySelector('.btn-launch'));
-                    }
-                } else {
-                    alert('❌ Error: ' + (result.message || 'No se pudo notificar.'));
-                }
-            } catch (error) {
-                alert('❌ Error de conexión.');
-            } finally {
-                notifyBtn.disabled = false;
-            }
+            handleApiResponse(
+                apiCall('api/notify_expiration.php', 'POST', { id: notifyBtn.dataset.id }),
+                { successMessage: '✅ Notificado.', onSuccess: fetchAdminSites }
+            ).finally(() => { notifyBtn.disabled = false; });
         }
 
+        // 7.3. Botón "Reportar Problema" (Sitios) - Usa el handler de main.js
+        // No se necesita código aquí porque main.js ya lo maneja.
+
+        // 7.4. Botón "Editar Sitio Personal"
         const reportBtn = e.target.closest('.btn-report-problem');
         if (reportBtn) {
             const siteId = reportBtn.dataset.siteId;
             if (!confirm('¿Reportar problema con este sitio?')) return;
-
-            try {
-                const response = await fetch('api/report_problem.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ site_id: siteId })
-                });
-                const result = await response.json();
-                
-                if (result.success) {
-                    alert('✅ Problema reportado.');
-                } else {
-                    alert('❌ Error: ' + (result.message || 'No se pudo reportar.'));
-                }
-            } catch (error) {
-                alert('❌ Error de conexión.');
-            }
+            handleApiResponse(
+                apiCall('api/report_problem.php', 'POST', { site_id: siteId }),
+                { successMessage: '✅ Problema reportado.' }
+            );
         }
 
         const editSiteBtn = e.target.closest('.btn-edit-site');
@@ -478,51 +417,44 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // 7.5. Botón "Eliminar Sitio Personal"
         const deleteSiteBtn = e.target.closest('.btn-delete-site');
         if (deleteSiteBtn) {
             if (!confirm('¿Estás seguro de que quieres eliminar este sitio personal?')) return;
             const id = deleteSiteBtn.dataset.id;
-            const result = await apiCall('api/delete_user_site.php', 'POST', { id });
-            if (result.success) {
-                alert('Sitio eliminado.');
-                fetchUserSites(); // Recargar solo sitios personales
-            } else {
-                alert('Error al eliminar el sitio: ' + result.message);
-            }
+            handleApiResponse(
+                apiCall('api/delete_user_site.php', 'POST', { id }),
+                { successMessage: 'Sitio eliminado.', onSuccess: fetchUserSites }
+            );
         }
     });
 
-    // --- EVENT LISTENERS ESPECÍFICOS PARA AGENDA ---
+    // 7.6. Listeners para la tabla de Agenda
     agendaTableBody?.addEventListener('click', async (e) => {
+        // Botón "Mostrar" contraseña
         const decryptBtn = e.target.closest('.decrypt-pass');
         if (decryptBtn) {
             const id = decryptBtn.dataset.id;
-            try {
-                const res = await fetch('api/decrypt_user_data.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.stringify({ id: id, type: 'reminder' })
-                });
-                const result = await res.json();
-                if (result.success) alert(`Usuario: ${result.data.username}\nContraseña: ${result.data.password}`);
-                else alert('Error: ' + result.message);
-            } catch (err) {
-                alert('Error al desencriptar.');
-            }
+            const result = await apiCall('api/decrypt_user_data.php', 'POST', { id: id, type: 'reminder' });
+                if (result.success) {
+                alert(`Usuario: ${result.data.username}\nContraseña: ${result.data.password}`);
+                } else {
+                alert('Error: ' + result.message);
+                }
         }
 
+        // Botón "Eliminar" recordatorio
         const deleteBtn = e.target.closest('.delete-reminder');
         if (deleteBtn) {
             if (!confirm('¿Eliminar este recordatorio?')) return;
             const id = deleteBtn.dataset.id;
-            const result = await apiCall('api/delete_user_reminder.php', 'POST', { id });
-            if (result.success) {
-                loadAgenda(); // Recargar solo agenda
-            } else {
-                alert('Error: ' + result.message);
-            }
+            handleApiResponse(
+                apiCall('api/delete_user_reminder.php', 'POST', { id }),
+                { onSuccess: loadAgenda }
+            );
         }
 
+        // Checkbox "Completado"
         const completeCheck = e.target.closest('.complete-reminder');
         if (completeCheck) {
             const id = completeCheck.dataset.id;
@@ -533,7 +465,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- COPIAR AL PORTAPAPELES ---
+    // --- 8. LÓGICA DE UI (PESTAÑAS, MODALES, TEMA) ---
     document.addEventListener('click', e => {
         const copyBtn = e.target.closest('.btn-copy');
         if (copyBtn) {
@@ -548,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // --- FUNCIONES AUXILIARES ---
+    // 8.1. Funciones Auxiliares de Formato
     function escapeHTML(str) {
         if (str === null || str === undefined) return '';
         const div = document.createElement('div');
@@ -567,7 +499,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return date.toLocaleDateString();
     }
 
-    // --- Selector de Tema ---
+    // 8.2. Gestión de Tema
     const themeSelect = document.getElementById('theme-select');
 
     function loadSavedTheme() {
@@ -592,17 +524,49 @@ document.addEventListener('DOMContentLoaded', function() {
         setTheme(e.target.value);
     });
 
-    // --- INICIALIZACIÓN ---
-    loadSavedTheme();
-    
-    // Cargar contenido de la primera pestaña activa (Mis Sitios por defecto)
-    const initialActiveTab = document.querySelector('.tab-link.active');
-    if (initialActiveTab) {
-        loadTabContent(initialActiveTab.dataset.tab);
+    // 8.3. Lógica de Pestañas
+    function setupTabs() {
+        const tabNav = document.querySelector('.tab-nav');
+        tabNav?.addEventListener('click', (e) => {
+            const tabButton = e.target.closest('.tab-link');
+            if (!tabButton) return;
+
+            const tabId = tabButton.dataset.tab;
+            showTab(tabId);
+        });
     }
 
-    // --- NOTIFICACIONES DE AGENDA ---
-    let notifiedReminders = new Set(); // Para evitar duplicados
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+        const activeTab = document.querySelector(`[data-tab="${tabId}"]`);
+        const activeTabContent = document.getElementById(tabId);
+
+        if (activeTab) activeTab.classList.add('active');
+        if (activeTabContent) activeTabContent.classList.add('active');
+
+        loadTabContent(tabId);
+    }
+
+    const loadedTabs = new Set();
+    function loadTabContent(tabId) {
+        if (loadedTabs.has(tabId)) return; // No recargar si ya se cargó
+
+        switch (tabId) {
+            case 'sites-tab':
+                fetchAdminSites();
+                fetchUserSites();
+                break;
+            case 'agenda-tab':
+                loadAgenda();
+                break;
+        }
+        loadedTabs.add(tabId);
+    }
+
+    // --- 9. NOTIFICACIONES DE AGENDA ---
+    // Sistema de alertas en el navegador para recordatorios vencidos.
 
     function checkReminders() {
         // Solo verificar si la pestaña de agenda está activa para ser más eficiente
@@ -648,8 +612,38 @@ document.addEventListener('DOMContentLoaded', function() {
         alert(message);
     }
 
-    // Verificar cada minuto
-    setInterval(checkReminders, 60000);
-    // Verificar inmediatamente al cargar la página
-    setTimeout(checkReminders, 2000);
+    // --- 10. INICIALIZACIÓN ---
+
+    /** Función principal que se ejecuta al cargar el DOM. */
+    function init() {
+        // Configurar listeners para UI estática
+        setupTabs();
+        loadSavedTheme();
+
+        // Listeners para modales
+        document.querySelectorAll('.close-modal-btn, .close-button').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(btn.dataset.modalId));
+        });
+        window.addEventListener('click', e => {
+            if (e.target.classList.contains('modal')) closeModal(e.target.id);
+        });
+
+        // Listeners para el chat
+        chatToggleBtn?.addEventListener('click', () => {
+            openModal('chat-modal');
+            startChatPolling();
+        });
+        document.querySelector('#chat-modal .close-button')?.addEventListener('click', stopChatPolling);
+
+        // Cargar contenido de la primera pestaña activa
+        const initialActiveTab = document.querySelector('.tab-link.active');
+        if (initialActiveTab) {
+            showTab(initialActiveTab.dataset.tab);
+        }
+
+        // Iniciar el verificador de recordatorios
+        setInterval(checkReminders, 60000);
+    }
+
+    init();
 });

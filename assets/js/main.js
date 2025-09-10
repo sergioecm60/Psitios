@@ -1,13 +1,29 @@
+/**
+ * /Psitios/assets/js/main.js
+ *
+ * Script global cargado en varias páginas.
+ * Contiene funcionalidades compartidas como el manejador de llamadas a la API
+ * y listeners para componentes que pueden aparecer en diferentes paneles,
+ * como el botón para reportar problemas.
+ */
+
 document.addEventListener('DOMContentLoaded', function() {
-    // --- ELEMENTOS GLOBALES ---
+    // --- 1. CONFIGURACIÓN GLOBAL ---
     const csrfMeta = document.querySelector('meta[name="csrf-token"]');
     const csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
 
-    // --- Objeto ayudante para centralizar las llamadas a la API ---
+    // --- 2. HELPERS (Funciones de Ayuda) ---
+
+    /**
+     * Objeto ayudante que centraliza y estandariza todas las llamadas fetch a la API.
+     * Proporciona un manejo de errores robusto para problemas de red, respuestas no-JSON,
+     * y errores del servidor, además de adjuntar automáticamente el token CSRF.
+     */
     const api = {
         async _request(endpoint, options = {}) {
             try {
                 const response = await fetch(endpoint, options);
+                // Si la respuesta no es OK, intenta parsear el error del cuerpo.
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error(`Respuesta de error del servidor (${response.status}) para ${endpoint}:`, errorText);
@@ -17,6 +33,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         return { success: false, message: `Error del servidor: ${response.status}. Revise la consola.` };
                     }
                 }
+                // Verifica si la respuesta es JSON antes de intentar parsearla.
                 const contentType = response.headers.get("content-type");
                 if (contentType && contentType.includes("application/json")) {
                     return await response.json();
@@ -26,6 +43,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     return { success: false, message: 'El servidor devolvió una respuesta en un formato inesperado.' };
                 }
             } catch (error) {
+                // Captura errores de red (ej. sin conexión).
                 console.error(`Error de red para ${endpoint}:`, error);
                 return { success: false, message: 'Error de conexión. Verifique su red.' };
             }
@@ -34,6 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return this._request(endpoint);
         },
         async post(endpoint, data) {
+            // Comprobación de seguridad: no intentar hacer POST sin token.
             if (!csrfToken) {
                 console.error('CSRF token no disponible. No se puede hacer POST.');
                 return { success: false, message: 'Error de seguridad. Recargue la página.' };
@@ -50,40 +69,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
+    /**
+     * Escapa caracteres HTML de una cadena para prevenir ataques XSS.
+     * Utiliza `textContent` para una sanitización segura y recomendada.
+     * @param {*} str - El valor a escapar.
+     * @returns {string} - La cadena segura.
+     */
     function escapeHTML(str) {
         if (str === null || str === undefined) return '';
         const p = document.createElement('p');
         p.textContent = String(str);
         return p.innerHTML;
     }
-
-    // --- LÓGICA SOLO PARA LA PÁGINA DE ADMINISTRACIÓN ---
-    if (document.body.classList.contains('page-admin')) {
-        // ... (todas las variables) ...
-
-        // ✅ LÓGICA DE PESTAÑAS: con verificación
-        const tabContainer = document.querySelector('.admin-tabs');
-        if (tabContainer) {
-            tabContainer.addEventListener('click', function(e) {
-                const tabButton = e.target.closest('.tab-link');
-                if (!tabButton) return;
-
-                e.preventDefault();
-                document.querySelectorAll('.tab-link').forEach(tab => tab.classList.remove('active'));
-                document.querySelectorAll('.admin-tab-content').forEach(content => content.classList.remove('active'));
-                tabButton.classList.add('active');
-                const tabId = tabButton.dataset.tab;
-                const targetContent = document.getElementById(tabId);
-                if (targetContent) {
-                    targetContent.classList.add('active');
-                }
-            });
-        }
-
-        // ... resto del código (usuarios, servicios, sitios) ...
-    }
-
-    // --- LÓGICA PARA REPORTAR PROBLEMAS ---
+    // --- 3. LÓGICA DE COMPONENTES GLOBALES ---
+    // Se usa delegación de eventos en `document.body` para manejar clics en botones
+    // que pueden ser creados dinámicamente, como los de las tarjetas de servicio.
     document.body.addEventListener('click', async (e) => {
         if (e.target.matches('.btn-report-problem')) {
             const button = e.target;
@@ -95,6 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
 
+            // Pide confirmación al usuario antes de enviar el reporte.
             if (confirm('¿Está seguro de que desea reportar un problema de acceso para este sitio?')) {
                 try {
                     button.disabled = true;
@@ -102,6 +103,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     const result = await api.post('api/create_notification.php', { site_id: siteId });
 
+                    // Proporciona feedback visual al usuario sobre el resultado.
                     if (result.success) {
                         alert(result.message || 'Reporte enviado con éxito.');
                         button.textContent = 'Reportado';

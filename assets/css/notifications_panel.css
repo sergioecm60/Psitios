@@ -1,20 +1,21 @@
-/* === NOTIFICATIONS PANEL CSS === */
-body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin: 0;
-    padding: 20px;
-    background-color: #f5f5f5;
-}
+/**
+ * /Psitios/assets/css/notifications_panel.css
+ *
+ * Estilos para la pestaña de notificaciones en admin.php y panel.php.
+ * Utiliza las variables CSS definidas en admin.css/panel.css para ser compatible con los temas.
+ */
 
+/* --- 1. LAYOUT & HEADER --- */
 .notifications-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 20px;
     padding: 15px;
-    background: white;
+    background: var(--bg-header);
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
 }
 
 .notifications-title {
@@ -28,7 +29,7 @@ body {
 }
 
 .notification-badge {
-    background: #dc3545;
+    background: var(--danger-color);
     color: white;
     border-radius: 50%;
     padding: 4px 8px;
@@ -36,7 +37,7 @@ body {
     font-weight: bold;
     min-width: 20px;
     text-align: center;
-    display: none;
+    display: none; /* Se cambia a 'flex' con JS para centrar */
 }
 
 .header-buttons {
@@ -44,8 +45,9 @@ body {
     gap: 10px;
 }
 
+/* --- 2. NOTIFICATION LIST & ITEMS --- */
 .notifications-container {
-    background: white;
+    background: var(--bg-container);
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     overflow: hidden;
@@ -53,7 +55,7 @@ body {
 
 .notification-item {
     padding: 15px;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-color);
     transition: all 0.2s ease;
     position: relative;
 }
@@ -61,75 +63,64 @@ body {
 .notification-item:last-child {
     border-bottom: none;
 }
-
 .notification-item:hover {
-    background-color: #f8f9fa;
+    background-color: var(--bg-hover);
 }
 
+/* --- 3. ITEM STATES (UNREAD) --- */
 .notification-item.unread {
-    background-color: #fff3cd;
-    border-left: 4px solid #ffc107;
-}
-
-.notification-item.unread::before {
-    content: '';
-    position: absolute;
-    left: 8px;
-    top: 20px;
-    width: 8px;
-    height: 8px;
-    background: #ffc107;
-    border-radius: 50%;
-}
-
-.notification-title {
-    font-weight: 600;
-    font-size: 16px;
-    color: #333;
-    margin-bottom: 8px;
-    padding-left: 15px;
+    background-color: var(--warning-bg);
+    border-left: 4px solid var(--warning-text);
 }
 
 .notification-item.unread .notification-title {
-    color: #856404;
+    color: var(--warning-text);
+}
+
+/* --- 4. ITEM CONTENT (TITLE, MESSAGE, META) --- */
+.notification-title {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-color);
+    margin-bottom: 8px;
 }
 
 .notification-message {
-    color: #666;
+    color: var(--text-secondary-color);
     line-height: 1.4;
     margin-bottom: 10px;
-    padding-left: 15px;
 }
 
 .notification-meta {
     font-size: 12px;
-    color: #999;
+    color: var(--text-secondary-color);
     display: flex;
     gap: 15px;
     flex-wrap: wrap;
     align-items: center;
-    padding-left: 15px;
     margin-bottom: 10px;
 }
 
-.notification-site {
-    color: #007bff;
+.notification-site,
+.notification-resolved {
     font-weight: 500;
-    background: #e3f2fd;
     padding: 2px 6px;
     border-radius: 3px;
+}
+
+.notification-site {
+    color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 15%, transparent);
 }
 
 .notification-resolved {
-    color: #28a745;
-    font-weight: 500;
-    background: #d4edda;
-    padding: 2px 6px;
-    border-radius: 3px;
+    color: var(--success-color);
+    background: color-mix(in srgb, var(--success-color) 15%, transparent);
 }
 
+/* --- 5. ACTION BUTTONS --- */
 .mark-read-btn {
-    background: #007bff;
+    background: var(--primary-color);
     color: white;
     border: none;
     padding: 6px 12px;
@@ -139,6 +130,21 @@ body {
     transition: background-color 0.2s;
     margin-left: 15px;
 }
+
+.btn-action {
+    border: none;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: filter 0.2s;
+}
+.btn-action:hover {
+    filter: brightness(1.1);
+}
+.resolve-btn { background-color: var(--success-color); color: white; margin-left: 5px; }
+.delete-notification-btn { background-color: var(--danger-color); color: white; float: right; margin-left: 5px; }
+
 
 .mark-read-btn:hover {
     background: #0056b3;
@@ -174,6 +180,7 @@ body {
     background: #e0a800;
 }
 
+.no-notifications,
 .no-notifications {
     padding: 40px;
     text-align: center;
@@ -184,24 +191,26 @@ body {
 .loading {
     padding: 40px;
     text-align: center;
-    color: #666;
+    color: var(--text-secondary-color);
 }
 
+/* --- 6. GLOBAL STATES (LOADING, EMPTY, MESSAGES) --- */
 .error-message {
-    background-color: #f8d7da;
-    color: #721c24;
+    background-color: var(--danger-bg);
+    color: var(--danger-text);
     padding: 15px;
-    border: 1px solid #f5c6cb;
+    border: 1px solid var(--danger-border);
     border-radius: 4px;
     margin: 10px 0;
     display: none;
 }
 
 .success-message {
-    background-color: #d1edff;
-    color: #0c5460;
+    /* Usamos los colores de éxito para consistencia */
+    background-color: color-mix(in srgb, var(--success-color) 15%, transparent);
+    color: var(--success-color);
     padding: 15px;
-    border: 1px solid #bee5eb;
+    border: 1px solid color-mix(in srgb, var(--success-color) 30%, transparent);
     border-radius: 4px;
     margin: 10px 0;
     display: none;

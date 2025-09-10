@@ -1,6 +1,14 @@
-/* assets/css/panel.css */
+/**
+ * /Psitios/assets/css/panel.css
+ *
+ * Hoja de estilos principal para el panel de usuario (/panel.php).
+ * Define la apariencia de las pestañas, secciones, modales y la tabla de agenda.
+ * Utiliza variables CSS (custom properties) para soportar múltiples temas.
+ */
+
+/* --- 1. THEME DEFINITIONS --- */
 :root {
-    /* Tema Claro (por defecto) */
+    /* 1.1. Tema Claro (por defecto) */
     --bg-body: #f4f7f9;
     --bg-container: #ffffff;
     --bg-header: #f8f9fa;
@@ -20,7 +28,7 @@
     --danger-border: #f5c6cb;
 }
 
-/* Tema Oscuro */
+/* 1.2. Tema Oscuro */
 [data-theme="dark"] {
     --bg-body: #121212;
     --bg-container: #1e1e1e;
@@ -28,7 +36,10 @@
     --bg-hover: #333;
     --primary-color: #0d6efd;
     --secondary-color: #adb5bd;
+    --success-color: #198754;
+    --danger-color: #dc3545;
     --text-color: #e0e0e0;
+    --text-secondary-color: #adb5bd;
     --border-color: #444;
     --warning-bg: #332701;
     --warning-text: #ffc107;
@@ -38,19 +49,40 @@
     --danger-border: #58151c;
 }
 
-/* Otros temas... */
-[data-theme="blue"] { --primary-color: #0056b3; --bg-body: #e6f3ff; --text-color: #003366; }
-[data-theme="green"] { --primary-color: #198754; --bg-body: #e8f5e8; --text-color: #1a5e2a; }
-
-body {
-    /* Transición suave para el cambio de tema */
-    transition: background-color 0.3s ease, color 0.3s ease;
+/* 1.3. Tema Azul (Completado) */
+[data-theme="blue"] {
+    --bg-body: #e6f3ff;
+    --bg-container: #ffffff;
+    --bg-header: #cce6ff;
+    --bg-hover: #d4edff;
+    --primary-color: #0056b3;
+    --secondary-color: #5a6268;
+    --success-color: #218838;
+    --danger-color: #c82333;
+    --text-color: #003366;
+    --text-secondary-color: #495057;
+    --border-color: #b3d9ff;
 }
 
-/* --- PESTAÑAS PRINCIPALES --- */
+/* 1.4. Tema Verde (Completado) */
+[data-theme="green"] {
+    --bg-body: #e8f5e8;
+    --bg-container: #ffffff;
+    --bg-header: #c8e6c8;
+    --bg-hover: #d4f0d4;
+    --primary-color: #198754;
+    --secondary-color: #5a6268;
+    --success-color: #157347;
+    --danger-color: #bb2d3b;
+    --text-color: #1a5e2a;
+    --text-secondary-color: #495057;
+    --border-color: #b8dbb8;
+}
+
+/* --- 2. TABS & NAVIGATION --- */
 .tab-nav {
     display: flex;
-    background: var(--bg-header);
+    background: transparent; /* El fondo lo da el contenedor padre */
     border-bottom: 2px solid var(--border-color);
     margin-bottom: 20px;
     border-radius: 8px 8px 0 0;
@@ -60,7 +92,7 @@ body {
 .tab-link {
     flex: 1;
     padding: 15px 20px;
-    background: var(--bg-header);
+    background: transparent;
     border: none;
     color: var(--text-secondary-color);
     font-size: 1rem;
@@ -76,13 +108,12 @@ body {
 }
 
 .tab-link.active {
-    background: var(--bg-container);
     color: var(--primary-color);
     border-bottom: 3px solid var(--primary-color);
     font-weight: 600;
 }
 
-/* --- CONTENIDO DE PESTAÑAS --- */
+/* 2.1. Contenido de Pestañas */
 .tab-content {
     display: none;
     animation: fadeIn 0.3s ease-in-out;
@@ -97,7 +128,7 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* --- SECCIONES ESPECÍFICAS --- */
+/* --- 3. SECTIONS & HEADERS --- */
 .sites-section {
     margin-bottom: 30px;
 }
@@ -120,7 +151,7 @@ body {
     border-bottom: 2px solid var(--primary-color);
 }
 
-/* --- MODALES --- */
+/* --- 4. MODALS (GENERAL & CHAT) --- */
 .modal {
     display: none;
     position: fixed;
@@ -148,7 +179,7 @@ body {
     overflow-y: auto;
 }
 
-/* Chat */
+/* 4.1. Modal de Chat */
 #chat-modal {
     display: none;
     position: fixed;
@@ -162,7 +193,7 @@ body {
 #chat-modal.active {
     display: flex;
 }
-/* .modal-content se define en main.css para consistencia */
+
 #chat-messages {
     max-height: 300px;
     overflow-y: auto;
@@ -173,18 +204,21 @@ body {
     margin-bottom: 10px;
     font-size: 0.9rem;
 }
+
 #chat-form {
     display: flex;
     gap: 10px;
 }
+
 #chat-input {
     flex: 1;
     padding: 10px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    background-color: var(--bg-container);
+    background-color: var(--bg-body); /* Ligeramente diferente para destacar */
     color: var(--text-color);
 }
+
 #chat-form button {
     padding: 10px 15px;
     background: var(--primary-color);
@@ -192,6 +226,7 @@ body {
     border: none;
     border-radius: 4px;
 }
+
 .chat-message {
     position: relative;
     margin: 8px 0;
@@ -200,24 +235,27 @@ body {
     max-width: 80%;
     line-height: 1.4;
 }
+
 .chat-message.sent {
     background: var(--primary-color);
     color: white;
     margin-left: auto;
     text-align: right;
 }
+
 .chat-message.received {
     background: var(--bg-hover);
     color: var(--text-color);
     margin-right: auto;
 }
+
 .delete-msg-btn {
     position: absolute;
     right: 0;
     top: 5px;
     background: none;
     border: none;
-    color: #dc3545;
+    color: var(--danger-color);
     cursor: pointer;
     font-size: 1.2rem;
     opacity: 0;
@@ -226,6 +264,8 @@ body {
 .chat-message:hover .delete-msg-btn {
     opacity: 1;
 }
+
+/* --- 5. COMPONENTS --- */
 .creds-display {
     margin-top: 10px;
     padding: 10px;
@@ -234,12 +274,14 @@ body {
     border-radius: 6px;
     font-size: 0.9rem;
 }
+
 .creds-display p {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin: 4px 0;
 }
+
 .btn-copy {
     margin-left: 10px;
     padding: 2px 6px;
@@ -251,11 +293,13 @@ body {
     border-radius: 3px;
     transition: background-color 0.2s, transform 0.2s;
 }
+
 .btn-copy:hover {
-    background-color: #5a6268;
+    background-color: var(--text-color);
     transform: scale(1.05);
 }
 
+/* --- 6. UTILITY & MISC CLASSES --- */
 .notification {
     background: var(--warning-bg);
     color: var(--warning-text);
@@ -278,24 +322,23 @@ body {
 .loading {
     text-align: center;
     padding: 40px;
-    color: #666;
+    color: var(--text-secondary-color);
     font-style: italic;
 }
 
+/* 6.1. Divisores de Contenido */
 .content-divider {
     margin: 30px 0;
     border: 0;
     border-top: 1px solid var(--border-color);
 }
 
-/* Separador más grueso (usar con <hr class="content-divider-heavy">) */
 .content-divider-heavy {
     margin: 40px 0;
     border: 0;
     border-top: 2px solid var(--border-color);
 }
 
-/* Separador con texto (usar con <hr class="content-divider text-divider">) */
 .text-divider {
     border-top: none; /* Oculta la línea original para que solo se vea el texto */
 }
@@ -306,6 +349,7 @@ body {
     color: var(--border-color);
 }
 
+/* 6.2. Selector de Tema */
 .theme-selector {
     display: flex;
     align-items: center;
@@ -321,7 +365,7 @@ body {
     color: var(--text-color);
 }
 
-/* --- TABLA DE AGENDA --- */
+/* --- 7. AGENDA TABLE --- */
 .table-wrapper {
     overflow-x: auto;
     margin-top: 15px;
@@ -363,7 +407,7 @@ body {
     padding: 20px;
 }
 
-/* --- RESPONSIVE --- */
+/* --- 8. RESPONSIVE DESIGN --- */
 @media (max-width: 768px) {
     .tab-link {
         padding: 12px 10px;

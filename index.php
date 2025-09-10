@@ -1,10 +1,16 @@
 <?php
 /**
- * Psitios/index.php
- * Página de inicio de sesión para Psitios.
+ * /Psitios/index.php - Página de inicio de sesión.
+ *
+ * Presenta el formulario de login y maneja la autenticación del usuario
+ * de forma asíncrona a través de una llamada al endpoint `api/login.php`.
  */
 require_once 'bootstrap.php';
 
+// --- Preparación de datos y seguridad ---
+
+// Generar un nonce para la Política de Seguridad de Contenido (CSP).
+$nonce = base64_encode(random_bytes(16));
 // Configuración del footer
 $config = [
     'footer' => [
@@ -17,14 +23,20 @@ $config = [
 ];
 
 // Generar un token CSRF para el formulario de login si no existe.
-generate_csrf_token();
+generate_csrf_token(); // La función está en config/security.php
 
 // Si el usuario ya está logueado, redirigir al panel correspondiente.
 if (isset($_SESSION['user_id'])) {
-    $redirect_url = ($_SESSION['user_role'] === 'admin') ? 'admin.php' : 'panel.php';
+    // La redirección se basa en el rol para dirigir al panel correcto.
+    $redirect_url = ($_SESSION['user_role'] === 'superadmin' || $_SESSION['user_role'] === 'admin') 
+        ? 'admin.php' 
+        : 'panel.php';
     header('Location: ' . $redirect_url);
     exit;
 }
+
+// --- Headers de Seguridad ---
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self';");
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -70,7 +82,7 @@ if (isset($_SESSION['user_id'])) {
         <a href="<?= htmlspecialchars($config['footer']['license_url'] ?? '#') ?>" target="_blank" rel="license">Términos y Condiciones (Licencia GNU GPL v3)</a>
     </footer>
 
-    <script>
+    <script nonce="<?= $nonce ?>">
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const loginError = document.getElementById('loginError');

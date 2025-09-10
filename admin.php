@@ -1,21 +1,36 @@
 <?php
+/**
+ * /Psitios/admin.php - Panel de Administración para roles 'admin' y 'superadmin'.
+ *
+ * Proporciona la interfaz para gestionar usuarios, empresas, sitios, y más.
+ * La lógica de la interfaz es manejada principalmente por assets/js/admin.js.
+ */
 require_once 'bootstrap.php';
-require_auth('admin');
+require_auth('admin'); // Solo permite acceso a usuarios con rol 'admin' o 'superadmin'
+
+// --- Preparación de datos para la vista ---
+$user_id = $_SESSION['user_id'];
+$user_role = $_SESSION['user_role'] ?? 'user';
+
+// Generar token CSRF si no existe
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
-$csrf_token = htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8');
-$user_role = $_SESSION['user_role'] ?? 'user';
-$user_id = $_SESSION['user_id'];
+$csrf_token = $_SESSION['csrf_token'];
+
+// Obtener el tema del usuario desde la BD
 $pdo = get_pdo_connection();
 $stmt = $pdo->prepare("SELECT theme FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
-$user_data = $stmt->fetch();
-$user_theme = $user_data['theme'] ?? 'light';
+$user_theme = $stmt->fetchColumn() ?: 'light';
 
-ini_set('display_errors', '1');
-ini_set('display_startup_errors', '1');
-error_reporting(E_ALL);
+// Generar un nonce para la Política de Seguridad de Contenido (CSP)
+$nonce = base64_encode(random_bytes(16));
+
+// --- Headers de Seguridad ---
+// Previene ataques de XSS al restringir de dónde se pueden cargar los scripts.
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self'; connect-src 'self';");
+// El error reporting ya está configurado en bootstrap.php, no es necesario repetirlo aquí.
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -25,16 +40,16 @@ error_reporting(E_ALL);
     <title>Panel de Administración</title>
     <link rel="icon" href="<?= BASE_URL ?>favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/css/admin.css">
-    <meta name="csrf-token" content="<?php echo $csrf_token; ?>">
+    <meta name="csrf-token" content="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="assets/css/notifications_panel.css">
 </head>
 <body 
-    data-csrf-token="<?php echo $csrf_token; ?>"
-    data-user-role="<?php echo $user_role; ?>"
+    data-csrf-token="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>"
+    data-user-role="<?= htmlspecialchars($user_role, ENT_QUOTES, 'UTF-8') ?>"
     data-theme="<?= htmlspecialchars($user_theme) ?>"
-    data-company-id="<?php echo $_SESSION['company_id'] ?? ''; ?>"
-    data-branch-id="<?php echo $_SESSION['branch_id'] ?? ''; ?>"
-    data-department-id="<?php echo $_SESSION['department_id'] ?? ''; ?>"
+    data-company-id="<?= htmlspecialchars($_SESSION['company_id'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+    data-branch-id="<?= htmlspecialchars($_SESSION['branch_id'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
+    data-department-id="<?= htmlspecialchars($_SESSION['department_id'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
 >
     <div class="container">
         <header>
@@ -62,6 +77,26 @@ error_reporting(E_ALL);
             <button class="tab-link" data-tab="messages-tab">💬 Mensajes</button>
             <button class="tab-link" data-tab="notifications-tab">Notificaciones</button>
         </nav>
+
+        <!-- Pestaña de Auditoría -->
+        <div id="audit-tab" class="tab-content">
+            <h2>📋 Bitácora de Actividades</h2>
+            <div class="table-wrapper">
+                <table id="audit-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Usuario</th>
+                            <th>Acción</th>
+                            <th>Servicio</th>
+                            <th>IP</th>
+                            <th>Fecha</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-table-body"></tbody>
+                </table>
+            </div>
+        </div>
 
         <!-- Pestaña de Usuarios -->
         <div id="users-tab" class="tab-content active">
@@ -244,7 +279,7 @@ error_reporting(E_ALL);
                 </div>
                 <div class="form-group">
                     <label for="department_id">Departamento</label>
-                    <select id="department_id" name="department_id" required>
+                    <select id="department_id" name="department_id">
                         <option value="">Seleccionar departamento</option>
                     </select>
                 </div>
@@ -407,27 +442,8 @@ error_reporting(E_ALL);
             </form>
         </div>
     </div>
-    <!-- Pestaña de Auditoría -->
-<div id="audit-tab" class="tab-content">
-    <h2>📋 Bitácora de Actividades</h2>
-    <div class="table-wrapper">
-        <table id="audit-table">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Usuario</th>
-                    <th>Acción</th>
-                    <th>Servicio</th>
-                    <th>IP</th>
-                    <th>Fecha</th>
-                </tr>
-            </thead>
-            <tbody id="audit-table-body"></tbody>
-        </table>
-    </div>
-</div>
 
-    <script src="assets/js/admin.js" defer></script>
-    <script src="assets/js/notifications_panel.js"></script>
+    <script src="assets/js/admin.js" nonce="<?= $nonce ?>" defer></script>
+    <script src="assets/js/notifications_panel.js" nonce="<?= $nonce ?>" defer></script>
 </body>
 </html>

@@ -1,14 +1,21 @@
 <?php
-// secure_panel/logout.php
+/**
+ * /Psitios/logout.php
+ *
+ * Script para finalizar de forma segura la sesión de un usuario.
+ * Sigue las mejores prácticas para la destrucción de sesiones en PHP.
+ */
 
-// 1. Cargar el bootstrap para acceder a la configuración de la sesión.
+// 1. Cargar el bootstrap. Esto es crucial porque inicia la sesión (`session_start()`)
+// y nos da acceso a las constantes como BASE_URL.
 require_once 'bootstrap.php';
 
-// 2. Eliminar todas las variables de sesión.
+// 2. Limpiar todas las variables de la superglobal $_SESSION.
 $_SESSION = array();
 
-// 3. Borrar la cookie de sesión.
-// Esto destruirá la sesión, y no solo los datos de la sesión.
+// 3. Invalidar la cookie de sesión en el navegador del cliente.
+// Esto es un paso de seguridad importante para asegurar que la cookie se elimine
+// y no pueda ser reutilizada.
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
@@ -17,9 +24,10 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
-// 4. Finalmente, destruir la sesión.
+// 4. Finalmente, destruir todos los datos asociados con la sesión actual en el servidor.
 session_destroy();
 
 // 5. Redirigir al usuario a la página de inicio de sesión.
-header('Location: index.php');
+// Se utiliza BASE_URL para asegurar una redirección correcta sin importar la estructura de directorios.
+header('Location: ' . BASE_URL . 'index.php?logout=1');
 exit;
