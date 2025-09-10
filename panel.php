@@ -120,19 +120,19 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <input type="hidden" id="user-site-id" name="id">
                 <div class="form-group">
                     <label for="user-site-name">Nombre del Sitio</label>
-                    <input type="text" id="user-site-name" name="name" required>
+                    <input type="text" id="user-site-name" name="name" required autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="user-site-url">URL</label>
-                    <input type="text" id="user-site-url" name="url">
+                    <input type="text" id="user-site-url" name="url" autocomplete="url">
                 </div>
                 <div class="form-group">
                     <label for="user-site-username">Usuario</label>
-                    <input type="text" id="user-site-username" name="username">
+                    <input type="text" id="user-site-username" name="username" autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label for="user-site-password">Contraseña (dejar en blanco para no cambiar)</label>
-                    <input type="password" id="user-site-password" name="password">
+                    <input type="password" id="user-site-password" name="password" autocomplete="new-password">
                 </div>
                 <div class="form-group">
                     <label for="user-site-notes">Notas</label>
@@ -157,7 +157,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <p>Cargando mensajes...</p>
             </div>
             <form id="chat-form">
-                <input type="text" id="chat-input" placeholder="Escribe un mensaje..." maxlength="255" required>
+                <input type="text" id="chat-input" placeholder="Escribe un mensaje..." maxlength="255" required autocomplete="off">
                 <button type="submit">Enviar</button>
             </form>
         </div>
@@ -174,22 +174,22 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <input type="hidden" id="reminder-id" name="id">
                 <div class="form-group">
                     <label for="reminder-type">Tipo</label>
-                    <select id="reminder-type" name="type" required>
+                    <select id="reminder-type" name="type" required autocomplete="off">
                         <option value="note">Nota</option>
                         <option value="credential">Credencial</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="reminder-title">Título</label>
-                    <input type="text" id="reminder-title" name="title" required>
+                    <input type="text" id="reminder-title" name="title" required autocomplete="off">
                 </div>
                 <div class="form-group credential-field">
                     <label for="reminder-username">Usuario</label>
-                    <input type="text" id="reminder-username" name="username">
+                    <input type="text" id="reminder-username" name="username" autocomplete="username">
                 </div>
                 <div class="form-group credential-field">
                     <label for="reminder-password">Contraseña (dejar en blanco para no cambiar)</label>
-                    <input type="password" id="reminder-password" name="password">
+                    <input type="password" id="reminder-password" name="password" autocomplete="new-password">
                 </div>
                 <div class="form-group">
                     <label for="reminder-notes">Nota / Descripción</label>
@@ -197,7 +197,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 </div>
                 <div class="form-group">
                     <label for="reminder-datetime">Fecha y Hora de Recordatorio (opcional)</label>
-                    <input type="datetime-local" id="reminder-datetime" name="reminder_datetime">
+                    <input type="datetime-local" id="reminder-datetime" name="reminder_datetime" autocomplete="off">
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
@@ -207,6 +207,23 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         </div>
     </div>
 
+    <!-- Modal para Alerta de Recordatorio -->
+    <div id="reminder-alert-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="reminder-alert-title">🔔 ¡Recordatorio!</h2>
+                <span class="close-button" data-modal-id="reminder-alert-modal">&times;</span>
+            </div>
+            <div id="reminder-alert-body">
+                <!-- Contenido se inyectará con JS -->
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary close-modal-btn" data-modal-id="reminder-alert-modal">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="assets/js/main.js" nonce="<?= htmlspecialchars($nonce) ?>" defer></script>
     <script src="assets/js/panel.js" nonce="<?= htmlspecialchars($nonce) ?>" defer></script>
 </body>
 </html>

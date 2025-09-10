@@ -34,7 +34,6 @@ function closeModal(modalId) {
 document.addEventListener('DOMContentLoaded', function() {
     // --- 2. CONFIGURACIÓN Y ESTADO ---
     // Elementos del DOM y datos iniciales
-    const csrfToken = document.getElementById('csrf_token')?.value;
     const adminId = document.getElementById('admin_id')?.value;
     const userId = document.getElementById('user_id')?.value;
 
@@ -53,65 +52,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Estado de la aplicación
     let chatPollingInterval = null;
-    let notifiedReminders = new Set(); // Para evitar notificaciones duplicadas
+    // Carga los IDs de recordatorios ya notificados desde localStorage para persistencia.
+    let notifiedReminders = new Set(JSON.parse(localStorage.getItem('notifiedReminders') || '[]'));
 
     // --- 3. HELPERS (Funciones de Ayuda) ---
-
-    /**
-     * Función centralizada para realizar todas las llamadas a la API.
-     * Utiliza la versión robusta para manejar errores de red, no-JSON, etc.
-     * @param {string} url - El endpoint de la API.
-     * @param {string} [method='GET'] - Método HTTP.
-     * @param {object|null} [body=null] - Cuerpo de la petición.
-     * @returns {Promise<object>} - La respuesta JSON del servidor.
-     */
-    async function apiCall(url, method = 'GET', body = null) {
-        const options = {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken
-            },
-        };
-        if (body) options.body = JSON.stringify(body);
-
-        try {
-            const response = await fetch(url, options);
-            const text = await response.text();
-
-            if (!text || text.trim() === '') {
-                if (!response.ok) throw new Error(`Respuesta vacía del servidor (Estado: ${response.status})`);
-                return { success: true, message: 'Operación completada.' };
-            }
-
-            const data = JSON.parse(text);
-            if (!response.ok) {
-                throw new Error(data.message || `Error del servidor: ${response.status}`);
-            }
-            return data;
-        } catch (error) {
-            console.error('💥 API Call Error:', error);
-            // Devuelve un objeto de error consistente para que el resto del código pueda manejarlo.
-            return { success: false, message: error.message };
-        }
-    }
-
-    /**
-     * Maneja la respuesta de una promesa de API, mostrando una alerta y/o recargando datos.
-     * @param {Promise<object>} apiPromise - La promesa devuelta por la llamada a la API.
-     * @param {object} options - Opciones para manejar la respuesta.
-     * @param {string} [options.successMessage] - Mensaje de éxito.
-     * @param {Function} [options.onSuccess] - Callback a ejecutar en caso de éxito.
-     */
-    async function handleApiResponse(apiPromise, { successMessage, onSuccess }) {
-        const result = await apiPromise;
-        if (result.success) {
-            if (successMessage) alert(successMessage);
-            if (onSuccess) onSuccess();
-        } else {
-            alert('Error: ' + (result.message || 'Ocurrió un error desconocido.'));
-        }
-    }
 
     // --- 4. LÓGICA DE CHAT ---
 
@@ -126,28 +70,37 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        handleApiResponse(
-            apiCall('api/send_message.php', 'POST', { message: text, receiver_id: adminId }),
-            { onSuccess: () => { chatInput.value = ''; fetchChatMessages(); } }
-        );
+        const result = await window.api.post('api/send_message.php', { message: text, receiver_id: adminId });
+        if (result.success) {
+            chatInput.value = '';
+            fetchChatMessages();
+        } else {
+            alert('Error al enviar mensaje: ' + result.message);
+        }
     });
 
     /** Obtiene y renderiza los mensajes del chat. */
     async function fetchChatMessages() {
         try {
-            const data = await apiCall('api/get_messages.php');
-            if (data.success) {
-                chatMessages.innerHTML = data.messages.map(msg => {
+            const result = await window.api.get('api/get_messages.php');
+            if (result.success) {
+                if (Array.isArray(result.data) && result.data.length > 0) {
+                    chatMessages.innerHTML = result.data.map(msg => {
                     const isSent = msg.sender_id == userId;
                     return `
                         <div class="chat-message ${isSent ? 'sent' : 'received'}">
-                            <strong>${isSent ? 'Tú' : 'Admin'}:</strong> ${escapeHTML(msg.message)}
+                            <strong>${isSent ? 'Tú' : 'Admin'}:</strong> ${window.escapeHTML(msg.message)}
                             <br><small>${formatTime(msg.created_at)}</small>
                             ${isSent ? `<button class="delete-msg-btn" data-id="${msg.id}" title="Eliminar">×</button>` : ''} 
                         </div>
                     `;
-                }).join('');
+                    }).join('');
+                } else {
+                    chatMessages.innerHTML = '<p>Aún no hay mensajes.</p>';
+                }
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+            } else {
+                chatMessages.innerHTML = `<p class="error">❌ ${result.message || 'Error al cargar mensajes.'}</p>`;
             }
         } catch (error) {
             chatMessages.innerHTML = `<p class="error">❌ ${error.message}</p>`;
@@ -172,10 +125,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const deleteBtn = e.target.closest('.delete-msg-btn');
         if (deleteBtn && confirm('¿Eliminar este mensaje?')) {
             const id = deleteBtn.dataset.id;
-            handleApiResponse(
-                apiCall('api/delete_user_message.php', 'POST', { message_id: id }),
-                { onSuccess: fetchChatMessages }
-            );
+            const result = await window.api.post('api/delete_user_message.php', { message_id: id });
+            if (result.success) {
+                fetchChatMessages();
+            } else {
+                alert('Error: ' + result.message);
+            }
         }
     });
 
@@ -189,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!grid) return;
         grid.innerHTML = '<div class="loading">Cargando sitios del administrador...</div>';
         try {
-            const result = await apiCall('api/get_user_sites.php');
+            const result = await window.api.get('api/get_user_sites.php');
             if (result.success && result.data.length > 0) {
                 grid.innerHTML = result.data.map(service => createServiceCard(service, true)).join('');
             } else if (result.success) {
@@ -210,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!grid) return;
         grid.innerHTML = '<div class="loading">Cargando tus sitios personales...</div>';
         try {
-            const result = await apiCall('api/get_user_sites_personal.php');
+            const result = await window.api.get('api/get_user_sites_personal.php');
             if (result.success && result.data.length > 0) {
                 grid.innerHTML = result.data.map(site => createServiceCard(site, false, true)).join('');
             } else if (result.success) {
@@ -237,7 +192,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         return `
             <div class="service-card">
-                <h3>${escapeHTML(item.name)}</h3>
+                <h3>${window.escapeHTML(item.name)}</h3>
                 ${isAssigned && item.password_needs_update ? '<p class="notification">⚠️ Contraseña pendiente</p>' : ''}
                 ${item.url ? `<a href="${escapeHTML(item.url)}" target="_blank" rel="noopener noreferrer" class="btn-launch">🌐 Acceder</a>` : ''}
                 <div class="credentials-area">
@@ -259,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!agendaTableBody) return;
         agendaTableBody.innerHTML = '<tr><td colspan="8" class="loading">Cargando agenda...</td></tr>';
         
-        const result = await apiCall('api/get_user_reminders.php');
+        const result = await window.api.get('api/get_user_reminders.php');
         agendaTableBody.innerHTML = '';
         
         if (result.success && result.data.length > 0) {
@@ -269,10 +224,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 tr.innerHTML = `
                     <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed == 1 ? 'checked' : ''}></td>
                     <td>${item.type === 'credential' ? '🔑' : '📝'}</td>
-                    <td>${escapeHTML(item.title)}</td>
-                    <td>${escapeHTML(item.username || '')}</td> 
+                    <td>${window.escapeHTML(item.title)}</td>
+                    <td>${window.escapeHTML(item.username || '')}</td> 
                     <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-type="reminder">Mostrar</button>` : ''}</td>
-                    <td>${escapeHTML(item.notes || '')}</td>
+                    <td>${window.escapeHTML(item.notes || '')}</td>
                     <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString() : ''}</td>
                     <td><button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
                 `;
@@ -298,10 +253,13 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-        handleApiResponse(
-            apiCall('api/save_user_site.php', 'POST', data),
-            { onSuccess: () => { closeModal('user-site-modal'); fetchUserSites(); } }
-        );
+        const result = await window.api.post('api/save_user_site.php', data);
+        if (result.success) {
+            closeModal('user-site-modal');
+            fetchUserSites();
+        } else {
+            alert('Error: ' + result.message);
+        }
     });
 
     document.getElementById('add-reminder-btn')?.addEventListener('click', () => {
@@ -328,10 +286,13 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         const formData = new FormData(e.target);
         const data = Object.fromEntries(formData.entries());
-        handleApiResponse(
-            apiCall('api/save_user_reminder.php', 'POST', data),
-            { onSuccess: () => { closeModal('reminder-modal'); loadAgenda(); } }
-        );
+        const result = await window.api.post('api/save_user_reminder.php', data);
+        if (result.success) {
+            closeModal('reminder-modal');
+            loadAgenda();
+        } else {
+            alert('Error: ' + result.message);
+        }
     });
 
     // --- 7. MANEJADORES DE EVENTOS DELEGADOS ---
@@ -357,16 +318,16 @@ document.addEventListener('DOMContentLoaded', function() {
             const endpoint = type === 'personal' ? 'api/decrypt_user_data.php' : 'api/get_credentials.php';
             const body = type === 'personal' ? { id: serviceId, type: 'site' } : { id: serviceId };
 
-            const result = await apiCall(endpoint, 'POST', body);
+            const result = await window.api.post(endpoint, body);
                 if (result.success) {
                     credsDiv.innerHTML = `
                         <p><strong>👤 Usuario:</strong> 
-                           <span>${escapeHTML(result.data.username)}</span> 
-                           <button class="btn-copy" data-copy="${escapeHTML(result.data.username)}">📋</button>
+                           <span>${window.escapeHTML(result.data.username)}</span> 
+                           <button class="btn-copy" data-copy="${window.escapeHTML(result.data.username)}">📋</button>
                         </p>
                         <p><strong>🔑 Contraseña:</strong> 
-                           <span>${escapeHTML(result.data.password)}</span> 
-                           <button class="btn-copy" data-copy="${escapeHTML(result.data.password)}">📋</button>
+                           <span>${window.escapeHTML(result.data.password)}</span> 
+                           <button class="btn-copy" data-copy="${window.escapeHTML(result.data.password)}">📋</button>
                         </p>
                     `;
                 } else {
@@ -379,30 +340,32 @@ document.addEventListener('DOMContentLoaded', function() {
         if (notifyBtn) {
             if (!confirm('¿Contraseña expirada? Se notificará al admin.')) return;
             notifyBtn.disabled = true;
-            handleApiResponse(
-                apiCall('api/notify_expiration.php', 'POST', { id: notifyBtn.dataset.id }),
-                { successMessage: '✅ Notificado.', onSuccess: fetchAdminSites }
-            ).finally(() => { notifyBtn.disabled = false; });
+            const result = await window.api.post('api/notify_expiration.php', { id: notifyBtn.dataset.id });
+            if (result.success) {
+                alert('✅ Notificado.');
+                fetchAdminSites();
+            } else {
+                alert('Error: ' + result.message);
+            }
+            notifyBtn.disabled = false;
         }
 
         // 7.3. Botón "Reportar Problema" (Sitios) - Usa el handler de main.js
         // No se necesita código aquí porque main.js ya lo maneja.
 
         // 7.4. Botón "Editar Sitio Personal"
-        const reportBtn = e.target.closest('.btn-report-problem');
-        if (reportBtn) {
-            const siteId = reportBtn.dataset.siteId;
+        const problemBtn = e.target.closest('.btn-report-problem');
+        if (problemBtn) {
+            const siteId = problemBtn.dataset.siteId;
             if (!confirm('¿Reportar problema con este sitio?')) return;
-            handleApiResponse(
-                apiCall('api/report_problem.php', 'POST', { site_id: siteId }),
-                { successMessage: '✅ Problema reportado.' }
-            );
+            const result = await window.api.post('api/report_problem.php', 'POST', { site_id: siteId });
+            if (result.success) alert('✅ Problema reportado.');
         }
 
         const editSiteBtn = e.target.closest('.btn-edit-site');
         if (editSiteBtn) {
             const id = editSiteBtn.dataset.id;
-            const result = await apiCall(`api/get_user_sites_personal.php?id=${id}`);
+            const result = await window.api.get(`api/get_user_sites_personal.php?id=${id}`);
             if (result.success) {
                 const site = result.data;
                 const form = document.getElementById('user-site-form');
@@ -422,10 +385,13 @@ document.addEventListener('DOMContentLoaded', function() {
         if (deleteSiteBtn) {
             if (!confirm('¿Estás seguro de que quieres eliminar este sitio personal?')) return;
             const id = deleteSiteBtn.dataset.id;
-            handleApiResponse(
-                apiCall('api/delete_user_site.php', 'POST', { id }),
-                { successMessage: 'Sitio eliminado.', onSuccess: fetchUserSites }
-            );
+            const result = await window.api.post('api/delete_user_site.php', { id });
+            if (result.success) {
+                alert('Sitio eliminado.');
+                fetchUserSites();
+            } else {
+                alert('Error: ' + result.message);
+            }
         }
     });
 
@@ -435,7 +401,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const decryptBtn = e.target.closest('.decrypt-pass');
         if (decryptBtn) {
             const id = decryptBtn.dataset.id;
-            const result = await apiCall('api/decrypt_user_data.php', 'POST', { id: id, type: 'reminder' });
+            const result = await window.api.post('api/decrypt_user_data.php', { id: id, type: 'reminder' });
                 if (result.success) {
                 alert(`Usuario: ${result.data.username}\nContraseña: ${result.data.password}`);
                 } else {
@@ -448,17 +414,19 @@ document.addEventListener('DOMContentLoaded', function() {
         if (deleteBtn) {
             if (!confirm('¿Eliminar este recordatorio?')) return;
             const id = deleteBtn.dataset.id;
-            handleApiResponse(
-                apiCall('api/delete_user_reminder.php', 'POST', { id }),
-                { onSuccess: loadAgenda }
-            );
+            const result = await window.api.post('api/delete_user_reminder.php', { id });
+            if (result.success) {
+                loadAgenda();
+            } else {
+                alert('Error: ' + result.message);
+            }
         }
 
         // Checkbox "Completado"
         const completeCheck = e.target.closest('.complete-reminder');
         if (completeCheck) {
             const id = completeCheck.dataset.id;
-            await apiCall('api/save_user_reminder.php', 'POST', {
+            await window.api.post('api/save_user_reminder.php', {
                 action: 'toggle_complete',
                 id: id
             });
@@ -481,13 +449,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 8.1. Funciones Auxiliares de Formato
-    function escapeHTML(str) {
-        if (str === null || str === undefined) return '';
-        const div = document.createElement('div');
-        div.textContent = String(str);
-        return div.innerHTML;
-    }
-
     function formatTime(timestamp) {
         const date = new Date(timestamp);
         const now = new Date();
@@ -514,7 +475,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Guardar en la base de datos en segundo plano
         try {
-            await apiCall('api/save_theme.php', 'POST', { theme: theme });
+            await window.api.post('api/save_theme.php', { theme: theme });
         } catch (error) {
             console.error('No se pudo guardar el tema en la base de datos:', error);
         }
@@ -606,10 +567,23 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showReminderAlert(reminder) {
-        let message = `🔔 Recordatorio: ${reminder.title}`;
-        if (reminder.username) message += `\n\nUsuario: ${reminder.username}`;
-        if (reminder.notes) message += `\nNota: ${reminder.notes}`;
-        alert(message);
+        const modal = document.getElementById('reminder-alert-modal');
+        const body = document.getElementById('reminder-alert-body');
+        if (!modal || !body) {
+            // Fallback al alert si el modal no existe
+            let message = `🔔 Recordatorio: ${reminder.title}`;
+            if (reminder.username) message += `\n\nUsuario: ${reminder.username}`;
+            if (reminder.notes) message += `\nNota: ${reminder.notes}`;
+            alert(message);
+            return;
+        }
+
+        let message = `<h3>${window.escapeHTML(reminder.title)}</h3>`;
+        if (reminder.username) message += `<p><strong>Usuario:</strong> ${window.escapeHTML(reminder.username)}</p>`;
+        if (reminder.notes) message += `<p><strong>Nota:</strong> ${window.escapeHTML(reminder.notes)}</p>`;
+        
+        body.innerHTML = message;
+        openModal('reminder-alert-modal');
     }
 
     // --- 10. INICIALIZACIÓN ---
