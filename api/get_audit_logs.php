@@ -10,7 +10,6 @@
 if (ob_get_level()) {
     ob_end_clean();
 }
-ob_start();
 
 // Carga el archivo de arranque (`bootstrap.php`), que inicia la sesión y carga
 // todas las configuraciones y funciones de ayuda.
@@ -24,7 +23,6 @@ header('Content-Type: application/json');
 
 // El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {
-    // Obtiene una conexión a la base de datos a través de la función de ayuda.
     $pdo = get_pdo_connection();
 
     // Prepara la consulta para obtener los últimos 100 registros de la bitácora.
@@ -62,6 +60,13 @@ try {
         // Convierte la fecha y hora a formato ISO 8601 (RFC3339), que es el estándar para APIs
         // y es fácilmente interpretable por JavaScript.
         $log['timestamp'] = date('c', strtotime($log['timestamp']));
+
+        // Si el nombre del sitio no se encontró (porque fue eliminado), intenta extraerlo
+        // del string de la acción para una visualización más clara.
+        if (empty($log['site_name']) && str_starts_with($log['action'], 'site_deleted:')) {
+            $log['site_name'] = trim(str_replace('site_deleted:', '', $log['action']));
+            $log['action'] = 'site_deleted';
+        }
     }
 
     // Envía la respuesta JSON con el indicador de éxito y la lista de registros de la bitácora.
@@ -70,19 +75,7 @@ try {
         'data' => $logs
     ]);
 
-} catch (Exception $e) {
-    // Si ocurre una excepción, se registra el error para depuración
-    // y se envía una respuesta de error genérica 500 al usuario.
-    error_log("Error en get_audit_logs.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error al cargar la bitácora'
-    ]);
+} catch (Throwable $e) {
+    // Si ocurre una excepción, se registra el error y se envía una respuesta genérica.
+    send_json_error_and_exit(500, 'Error al cargar la bitácora.', $e);
 }
-
-// Envía el contenido del buffer de salida (la respuesta JSON) y termina la ejecución del script.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

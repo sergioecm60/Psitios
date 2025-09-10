@@ -190,6 +190,12 @@ try {
                     $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
                     if (!$id) send_json_error(400, 'ID de sitio no válido.');
 
+                    // Obtener el nombre del sitio ANTES de eliminarlo para poder registrarlo.
+                    $stmt_get_name = $pdo->prepare("SELECT name FROM sites WHERE id = ?");
+                    $stmt_get_name->execute([$id]);
+                    $site = $stmt_get_name->fetch();
+                    $site_name_for_log = $site ? $site['name'] : "ID {$id}";
+
                     // ✅ Validación de dependencias: no permitir eliminar si está asignado.
                     $stmt = $pdo->prepare("SELECT COUNT(*) FROM services WHERE site_id = ?");
                     $stmt->execute([$id]);
@@ -207,6 +213,7 @@ try {
                     $stmt->execute($params);
 
                     if ($stmt->rowCount() > 0) {
+                        log_action($pdo, $current_user_id, null, "site_deleted: {$site_name_for_log}", $_SERVER['REMOTE_ADDR']);
                         echo json_encode(['success' => true, 'message' => 'Sitio eliminado.']);
                     } else {
                         send_json_error(404, 'Sitio no encontrado o sin permisos.');

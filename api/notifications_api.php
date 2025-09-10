@@ -114,6 +114,12 @@ try {
                 $id = filter_var($input['notification_id'] ?? null, FILTER_VALIDATE_INT);
                 if (!$id) send_json_error_and_exit(400, 'ID de notificación requerido.');
 
+                // Obtener el mensaje de la notificación para el log antes de eliminarla.
+                $stmt_get_msg = $pdo->prepare("SELECT message FROM notifications WHERE id = ?");
+                $stmt_get_msg->execute([$id]);
+                $notification = $stmt_get_msg->fetch();
+                $notification_message_for_log = $notification ? substr($notification['message'], 0, 200) : "ID {$id}";
+
                 $sql = "DELETE n FROM notifications n ";
                 $params = [];
                 if ($user_role === 'admin' && $department_id) {
@@ -129,6 +135,7 @@ try {
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($params);
                 if ($stmt->rowCount() > 0) {
+                    log_action($pdo, $user_id, null, "notification_deleted: {$notification_message_for_log}", $_SERVER['REMOTE_ADDR']);
                     echo json_encode(['success' => true, 'message' => 'Notificación eliminada.']);
                 } else {
                     send_json_error_and_exit(404, 'Notificación no encontrada o sin permisos.');

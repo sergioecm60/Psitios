@@ -785,7 +785,7 @@ ALTER TABLE `user_sites`
 -- Constraints for table `audit_logs`
 --
 ALTER TABLE `audit_logs`
-  ADD CONSTRAINT `fk_audit_service` FOREIGN KEY (`service_id`) REFERENCES `services` (`id`) ON DELETE RESTRICT,
+  ADD CONSTRAINT `fk_audit_service` FOREIGN KEY (`service_id`) REFERENCES `services` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
 
 --
