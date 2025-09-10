@@ -1,6 +1,5 @@
 <?php
 /**
- * api/get_user_sites.php
  * Endpoint de la API para obtener la lista de sitios compartidos asignados al usuario autenticado.
  * Se utiliza en el panel de usuario (panel.js) para mostrar los sitios a los que tiene acceso.
  */
@@ -9,7 +8,6 @@
 if (ob_get_level()) {
     ob_end_clean();
 }
-ob_start();
 
 // Carga el archivo de arranque, que inicia la sesión y carga todas las dependencias y funciones.
 require_once '../bootstrap.php';
@@ -18,14 +16,6 @@ require_auth();
 
 // Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json');
-
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
 
 // El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {
@@ -73,15 +63,7 @@ try {
         'data' => $sites
     ]);
 
-} catch (Exception $e) {
-    // Si ocurre una excepción, se registra el error para depuración
-    // y se envía una respuesta de error genérica al usuario.
-    error_log("Error en get_user_sites.php: " . $e->getMessage());
-    send_json_error(500, 'Error al cargar los sitios asignados.');
+    // Captura cualquier excepción o error inesperado, lo registra y devuelve un error genérico 500.
+} catch (Throwable $e) {
+    send_json_error_and_exit(500, 'Error al cargar los sitios asignados.', $e);
 }
-
-// Envía el contenido del buffer de salida (la respuesta JSON) y termina la ejecución del script.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

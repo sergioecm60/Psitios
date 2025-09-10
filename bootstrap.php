@@ -111,3 +111,15 @@ set_error_handler(function ($severity, $message, $file, $line) {
 // La responsabilidad de capturar excepciones ahora recae completamente en los
 // bloques `try/catch (Throwable $e)` de cada script de la API,
 // lo que evita terminaciones abruptas y respuestas vacías.
+
+// Función de ayuda global para enviar respuestas de error JSON y terminar el script.
+function send_json_error_and_exit(int $code, string $message, ?Throwable $e = null): void {
+    // Si se proporciona una excepción, registrarla si es un error del servidor.
+    if ($e !== null && $code >= 500) {
+        error_log("API Error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine());
+    }
+    http_response_code($code);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['success' => false, 'message' => $message]);
+    exit;
+}

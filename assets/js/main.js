@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
      * Proporciona un manejo de errores robusto para problemas de red, respuestas no-JSON,
      * y errores del servidor, además de adjuntar automáticamente el token CSRF.
      */
-    const api = {
+    window.api = {
         async _request(endpoint, options = {}) {
             try {
                 const response = await fetch(endpoint, options);
@@ -75,12 +75,12 @@ document.addEventListener('DOMContentLoaded', function() {
      * @param {*} str - El valor a escapar.
      * @returns {string} - La cadena segura.
      */
-    function escapeHTML(str) {
+    window.escapeHTML = function(str) {
         if (str === null || str === undefined) return '';
         const p = document.createElement('p');
         p.textContent = String(str);
         return p.innerHTML;
-    }
+    };
     // --- 3. LÓGICA DE COMPONENTES GLOBALES ---
     // Se usa delegación de eventos en `document.body` para manejar clics en botones
     // que pueden ser creados dinámicamente, como los de las tarjetas de servicio.
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     button.disabled = true;
                     button.textContent = 'Reportando...';
 
-                    const result = await api.post('api/create_notification.php', { site_id: siteId });
+                    const result = await window.api.post('api/create_notification.php', { site_id: siteId });
 
                     // Proporciona feedback visual al usuario sobre el resultado.
                     if (result.success) {

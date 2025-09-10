@@ -18,10 +18,6 @@ class NotificationManager {
         this.fetchInterval = null;
         this.fetchIntervalMs = 30000; // 30 segundos
 
-        // --- Dependencias del DOM ---
-        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
-        this.csrfToken = csrfMeta ? csrfMeta.getAttribute('content') : null;
-
         // Iniciar el gestor
         this.init();
     }
@@ -207,11 +203,11 @@ class NotificationManager {
             const isResolved = !!notification.resolved_at;
             return `
                 <div class="notification-item ${notification.is_read ? '' : 'unread'}" data-id="${notification.id}">
-                    <div class="notification-title">${this.escapeHtml(notification.title || 'Notificación')}</div>
-                    <div class="notification-message">${this.escapeHtml(notification.message)}</div>
+                    <div class="notification-title">${window.escapeHTML(notification.title || 'Notificación')}</div>
+                    <div class="notification-message">${window.escapeHTML(notification.message)}</div>
                     <div class="notification-meta">
                         <span class="notification-time">⏰ ${this.formatTime(notification.created_at)}</span>
-                        ${notification.site_name ? `<span class="notification-site">🌐 ${this.escapeHtml(notification.site_name)}</span>` : ''}
+                        ${notification.site_name ? `<span class="notification-site">🌐 ${window.escapeHTML(notification.site_name)}</span>` : ''}
                         ${isResolved 
                             ? `<span class="notification-resolved">✅ Resuelto: ${this.formatTime(notification.resolved_at)}</span>` 
                             : `<button class="btn-action resolve-btn" data-id="${notification.id}">✅ Resuelto</button>`
@@ -225,40 +221,13 @@ class NotificationManager {
     }
 
     /**
-     * Centraliza las llamadas POST a la API para acciones de notificación.
-     * @param {string} endpoint - La URL de la API.
-     * @param {string} action - La acción a realizar (ej. 'delete', 'mark_read').
-     * @param {object} data - Datos adicionales para enviar en el cuerpo.
-     * @returns {Promise<object>} - La respuesta JSON de la API.
-     */
-    async _apiAction(endpoint, action, data = {}) {
-        const requestBody = { action, ...data };
-        const headers = {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        };
-        if (this.csrfToken) {
-            headers['X-CSRF-TOKEN'] = this.csrfToken;
-        }
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: headers,
-            credentials: 'same-origin',
-            body: JSON.stringify(requestBody)
-        });
-
-        return response.json();
-    }
-
-    /**
      * Elimina una notificación.
      * @param {number} notificationId - El ID de la notificación a eliminar.
      */
     async deleteNotification(notificationId) {
         if (!confirm('¿Eliminar esta notificación?')) return;
         this.handleApiResponse(
-            this._apiAction('api/notifications_api.php', 'delete', { notification_id: notificationId }),
+            window.api.post('api/notifications_api.php', { action: 'delete', notification_id: notificationId }),
             'Notificación eliminada'
         );
     }
@@ -269,7 +238,7 @@ class NotificationManager {
      */
     async markAsRead(notificationId) {
         this.handleApiResponse(
-            this._apiAction('api/notifications_api.php', 'mark_read', { notification_id: notificationId }),
+            window.api.post('api/notifications_api.php', { action: 'mark_read', notification_id: notificationId }),
             'Notificación marcada como leída'
         );
     }
@@ -279,7 +248,7 @@ class NotificationManager {
      */
     async markAllAsRead() {
         this.handleApiResponse(
-            this._apiAction('api/notifications_api.php', 'mark_all_read'),
+            window.api.post('api/notifications_api.php', { action: 'mark_all_read' }),
             'Todas las notificaciones marcadas como leídas'
         );
     }
@@ -290,7 +259,7 @@ class NotificationManager {
      */
     async resolveNotification(notificationId) {
         this.handleApiResponse(
-            this._apiAction('api/resolve_notification.php', 'resolve', { notification_id: notificationId }),
+            window.api.post('api/resolve_notification.php', { action: 'resolve', notification_id: notificationId }),
             'Notificación resuelta y servicio actualizado'
         );
     }
@@ -354,14 +323,6 @@ class NotificationManager {
         const retryBtn = document.getElementById('retry-btn');
         if (retryBtn) retryBtn.style.display = 'none';
         this.fetchNotifications();
-    }
-
-    escapeHtml(text) {
-        // NOTA: Esta función es un candidato ideal para un archivo de utilidades global (utils.js)
-        // para evitar duplicación entre admin.js, panel.js, etc.
-        const div = document.createElement('div');
-        div.textContent = text || '';
-        return div.innerHTML;
     }
 
     formatTime(timestamp) {

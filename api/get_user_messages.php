@@ -1,6 +1,5 @@
 <?php
 /**
- * api/get_user_messages.php
  * Endpoint de la API para que un administrador obtenga todos los mensajes
  * que le han enviado los usuarios.
  * Se utiliza en la pestaña "Mensajes" del panel de administración.
@@ -10,7 +9,6 @@
 if (ob_get_level()) {
     ob_end_clean();
 }
-ob_start();
 
 // Carga el archivo de arranque (`bootstrap.php`), que inicia la sesión y carga
 // todas las configuraciones y funciones de ayuda.
@@ -21,14 +19,6 @@ require_auth('admin'); // Solo administradores
 
 // Informa al cliente que la respuesta de este script será en formato JSON.
 header('Content-Type: application/json');
-
-// Función de ayuda para estandarizar las respuestas de error.
-function send_json_error($code, $message) {
-    http_response_code($code);
-    echo json_encode(['success' => false, 'message' => $message]);
-    if (ob_get_level()) ob_end_flush();
-    exit;
-}
 
 // El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {
@@ -65,15 +55,7 @@ try {
 
     // 5. Enviar la respuesta exitosa.
     echo json_encode(['success' => true, 'data' => $messages]);
-} catch (Exception $e) {
-    // Si ocurre una excepción, se registra el error para depuración
-    // y se envía una respuesta de error genérica al usuario.
-    error_log("Error en get_user_messages.php: " . $e->getMessage());
-    send_json_error(500, 'Error interno del servidor al cargar los mensajes.');
+    // Captura cualquier excepción o error inesperado, lo registra y devuelve un error genérico 500.
+} catch (Throwable $e) {
+    send_json_error_and_exit(500, 'Error interno del servidor al cargar los mensajes.', $e);
 }
-
-// Envía el contenido del buffer de salida (la respuesta JSON) y termina la ejecución del script.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;

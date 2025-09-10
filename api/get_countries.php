@@ -1,6 +1,5 @@
 <?php
 /**
- * api/get_countries.php
  * Endpoint de la API para obtener una lista de todos los países disponibles.
  * Se utiliza en el panel de administración, específicamente en el formulario
  * de creación/edición de sucursales, para poblar el menú desplegable de países.
@@ -10,7 +9,6 @@
 if (ob_get_level()) {
     ob_end_clean();
 }
-ob_start();
 
 // Carga el archivo de arranque (`bootstrap.php`), que inicia la sesión y carga
 // todas las configuraciones y funciones de ayuda.
@@ -42,16 +40,7 @@ try {
 
     // 5. Enviar la respuesta exitosa.
     echo json_encode(['success' => true, 'data' => $countries]);
-} catch (Exception $e) {
-    // Si ocurre una excepción, se registra el error para depuración
-    // y se envía una respuesta de error genérica al usuario.
-    error_log("Error en get_countries.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error interno del servidor al cargar los países.']);
+    // Captura cualquier excepción o error inesperado, lo registra y devuelve un error genérico 500.
+} catch (Throwable $e) {
+    send_json_error_and_exit(500, 'Error interno del servidor al cargar los países.', $e);
 }
-
-// Envía el contenido del buffer de salida (la respuesta JSON) y termina la ejecución del script.
-if (ob_get_level()) {
-    ob_end_flush();
-}
-exit;
