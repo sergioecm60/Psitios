@@ -52,10 +52,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Estado de la aplicación
     let chatPollingInterval = null;
-    // Carga los IDs de recordatorios ya notificados desde localStorage para persistencia.
     let notifiedReminders = new Set(JSON.parse(localStorage.getItem('notifiedReminders') || '[]'));
-
-    // --- 3. HELPERS (Funciones de Ayuda) ---
+    let agendaItems = []; // Almacena los recordatorios para la comprobación de notificaciones.
 
     // --- 4. LÓGICA DE CHAT ---
 
@@ -211,30 +209,33 @@ document.addEventListener('DOMContentLoaded', function() {
     /** Obtiene y renderiza la tabla de la agenda. */
     async function loadAgenda() {
         if (!agendaTableBody) return;
-        agendaTableBody.innerHTML = '<tr><td colspan="8" class="loading">Cargando agenda...</td></tr>';
+        agendaTableBody.innerHTML = '<tr><td colspan="6" class="loading">Cargando agenda...</td></tr>';
         
         const result = await window.api.get('api/get_user_reminders.php');
         agendaTableBody.innerHTML = '';
         
         if (result.success && result.data.length > 0) {
+            agendaItems = result.data; // Almacena los datos para las notificaciones
             result.data.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.dataset.id = item.id; // Asignar ID para notificaciones
                 tr.innerHTML = `
-                    <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed == 1 ? 'checked' : ''}></td>
+                    <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed ? 'checked' : ''}></td>
                     <td title="${item.type === 'credential' ? 'Credencial' : 'Nota'}">${item.type === 'credential' ? '🔑' : '📝'}</td>
                     <td>${window.escapeHTML(item.title)}</td>
                     <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-type="reminder">Mostrar</button>` : ''}</td>
-                    <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString() : ''}</td>
+                    <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString('es-ES') : ''}</td>
                     <td><button class="btn btn-sm btn-secondary edit-reminder" data-id="${item.id}">Editar</button>
                         <button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
                 `;
                 agendaTableBody.appendChild(tr);
             });
         } else if (result.success) {
-            agendaTableBody.innerHTML = '<tr><td colspan="8" class="no-reminders-cell">No tienes recordatorios en tu agenda.</td></tr>';
+            agendaItems = [];
+            agendaTableBody.innerHTML = '<tr><td colspan="6" class="no-reminders-cell">No tienes recordatorios en tu agenda.</td></tr>';
         } else {
-            agendaTableBody.innerHTML = `<tr><td colspan="8" class="error">❌ ${result.message || 'Error al cargar la agenda.'}</td></tr>`;
+            agendaItems = [];
+            agendaTableBody.innerHTML = `<tr><td colspan="6" class="error">❌ ${result.message || 'Error al cargar la agenda.'}</td></tr>`;
         }
     }
 
@@ -354,18 +355,10 @@ document.addEventListener('DOMContentLoaded', function() {
         // No se necesita código aquí porque main.js ya lo maneja.
 
         // 7.4. Botón "Editar Sitio Personal"
-        const problemBtn = e.target.closest('.btn-report-problem');
-        if (problemBtn) {
-            const siteId = problemBtn.dataset.siteId;
-            if (!confirm('¿Reportar problema con este sitio?')) return;
-            const result = await window.api.post('api/report_problem.php', 'POST', { site_id: siteId });
-            if (result.success) alert('✅ Problema reportado.');
-        }
-
         const editSiteBtn = e.target.closest('.btn-edit-site');
         if (editSiteBtn) {
             const id = editSiteBtn.dataset.id;
-            const result = await window.api.get(`api/get_user_sites_personal.php?id=${id}`);
+            const result = await window.api.get(`api/get_user_site_details.php?id=${id}`);
             if (result.success) {
                 const site = result.data;
                 const form = document.getElementById('user-site-form');
@@ -377,6 +370,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('user-site-username').value = site.username;
                 document.getElementById('user-site-notes').value = site.notes;
                 openModal('user-site-modal');
+            } else {
+                alert('Error al cargar los detalles del sitio: ' + result.message);
             }
         }
 
@@ -392,44 +387,6 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 alert('Error: ' + result.message);
             }
-        }
-    });
-
-    // 7.6. Listeners para la tabla de Agenda
-    agendaTableBody?.addEventListener('click', async (e) => {
-        // Botón "Mostrar" contraseña
-        const decryptBtn = e.target.closest('.decrypt-pass');
-        if (decryptBtn) {
-            const id = decryptBtn.dataset.id;
-            const result = await window.api.post('api/decrypt_user_data.php', { id: id, type: 'reminder' });
-                if (result.success) {
-                alert(`Usuario: ${result.data.username}\nContraseña: ${result.data.password}`);
-                } else {
-                alert('Error: ' + result.message);
-                }
-        }
-
-        // Botón "Eliminar" recordatorio
-        const deleteBtn = e.target.closest('.delete-reminder');
-        if (deleteBtn) {
-            if (!confirm('¿Eliminar este recordatorio?')) return;
-            const id = deleteBtn.dataset.id;
-            const result = await window.api.post('api/delete_user_reminder.php', { id });
-            if (result.success) {
-                loadAgenda();
-            } else {
-                alert('Error: ' + result.message);
-            }
-        }
-
-        // Checkbox "Completado"
-        const completeCheck = e.target.closest('.complete-reminder');
-        if (completeCheck) {
-            const id = completeCheck.dataset.id;
-            await window.api.post('api/save_user_reminder.php', {
-                action: 'toggle_complete',
-                id: id
-            });
         }
     });
 
@@ -591,38 +548,31 @@ document.addEventListener('DOMContentLoaded', function() {
     // Sistema de alertas en el navegador para recordatorios vencidos.
 
     function checkReminders() {
-        // Solo verificar si la pestaña de agenda está activa para ser más eficiente
-        if (!document.getElementById('agenda-tab')?.classList.contains('active')) {
-            return;
-        }
-
         const now = new Date();
 
-        // Obtener recordatorios de la tabla
-        document.querySelectorAll('#agenda-table tbody tr').forEach(tr => {
-            const id = tr.dataset.id;
-            if (!id || notifiedReminders.has(id)) return;
+        agendaItems.forEach(async (item) => {
+            // Comprobar si el recordatorio está vencido, no completado y no notificado previamente.
+            if (!item.id || notifiedReminders.has(String(item.id)) || !item.reminder_datetime || item.is_completed) {
+                return;
+            }
 
-            const datetimeCell = tr.querySelector('td:nth-child(7)');
-            const datetimeText = datetimeCell?.textContent.trim();
-            
-            if (!datetimeText) return;
+            const reminderTime = new Date(item.reminder_datetime);
+            if (isNaN(reminderTime.getTime()) || reminderTime > now) {
+                return;
+            }
 
-            const reminderTime = new Date(datetimeText);
-            if (isNaN(reminderTime.getTime())) return;
+            // Marcar como notificado inmediatamente para evitar llamadas duplicadas.
+            notifiedReminders.add(String(item.id));
+            localStorage.setItem('notifiedReminders', JSON.stringify(Array.from(notifiedReminders)));
 
-            if (reminderTime <= now) {
-                const title = tr.querySelector('td:nth-child(3)').textContent;
-                const username = tr.querySelector('td:nth-child(4)').textContent;
-                const notes = tr.querySelector('td:nth-child(6)').textContent;
-
-                showReminderAlert({
-                    id: id,
-                    title: title,
-                    username: username,
-                    notes: notes
-                });
-                notifiedReminders.add(id);
+            // Obtener los detalles completos para mostrar en la notificación.
+            const result = await window.api.get(`api/get_user_reminder_details.php?id=${item.id}`);
+            if (result.success) {
+                showReminderAlert(result.data);
+            } else {
+                console.error(`Fallo al obtener detalles del recordatorio ${item.id}:`, result.message);
+                // Mostrar una alerta de fallback si falla la obtención de detalles.
+                showReminderAlert({ title: item.title, username: '(No se pudieron cargar los detalles)', notes: '' });
             }
         });
     }
