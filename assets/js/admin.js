@@ -36,69 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 2. CONFIGURACIÓN GLOBAL Y CONSTANTES ---
     // Leemos datos importantes pasados desde PHP a través de atributos data-* en la etiqueta <body>.
     const adminData = document.body.dataset;
-    const CSRF_TOKEN = adminData.csrfToken;
     const CURRENT_USER_ROLE = adminData.userRole;
     const CURRENT_USER_COMPANY_ID = adminData.companyId;
     const CURRENT_USER_BRANCH_ID = adminData.branchId;
     const CURRENT_USER_DEPARTMENT_ID = adminData.departmentId;
 
     // --- 3. FUNCIONES AUXILIARES ---
-
-    /**
-     * Función centralizada para realizar todas las llamadas a la API.
-     * Maneja la configuración de headers (incluyendo CSRF), el cuerpo de la petición,
-     * y un robusto control de errores para respuestas no-JSON, errores de red, etc.
-     * @param {string} url - El endpoint de la API.
-     * @param {string} [method='GET'] - Método HTTP (GET, POST, etc.).
-     * @param {object|null} [body=null] - El cuerpo de la petición para POST/PUT.
-     * @returns {Promise<object|null>} - La respuesta JSON del servidor o null si hay un error.
-     */
-    async function apiCall(url, method = 'GET', body = null) {
-        const options = {
-            method,
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': CSRF_TOKEN
-            }
-        };
-        if (body) {
-            options.body = JSON.stringify(body);
-        }
-        
-        try {
-            const response = await fetch(url, options);
-            const text = await response.text();
-
-            // Maneja respuestas vacías que pueden ser válidas (ej. 204 No Content) pero que romperían JSON.parse.
-            if (!text || text.trim() === '') {
-                if (!response.ok)
-                throw new Error(`Respuesta vacía del servidor (Estado: ${response.status})`);
-                return { success: true, message: 'Operación completada con éxito.' }; // Asumir éxito si la respuesta es OK pero vacía.
-            }
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (parseError) {
-                console.error('❌ Error parsing JSON:', parseError, 'Response text:', text);
-                throw new Error('Respuesta del servidor no es JSON válido: ' + text.substring(0, 100));
-            }
-
-            // Si la respuesta no fue exitosa (ej. status 400, 403, 500), lanza un error con el mensaje del servidor.
-            if (!response.ok) {
-                let errorMessage = data.message || `Error ${response.status}`;
-                if (data.error) {
-                    errorMessage += `\nDetalles: ${data.error}`;
-                }
-                throw new Error(errorMessage);
-            }
-
-            return data;
-        } catch (error) {
-            console.error('💥 API Call Error:', error);
-            alert('Error: ' + error.message);
-            return null;
-        }
-    }
 
     /**
      * Formatea una cadena de fecha (ej. '2023-10-27 10:30:00') a un formato legible en español.
@@ -119,19 +62,6 @@ document.addEventListener('DOMContentLoaded', function() {
             });
     }
 
-    /**
-     * Escapa caracteres HTML de una cadena para prevenir ataques XSS.
-     * Utiliza `textContent` para una sanitización segura y recomendada.
-     * @param {*} unsafe - El valor a escapar.
-     * @returns {string} - La cadena segura.
-     */
-    function escapeHtml(unsafe) {
-        if (unsafe === null || typeof unsafe === 'undefined') return '';
-        const div = document.createElement('div');
-        div.textContent = String(unsafe);
-        return div.innerHTML;
-    }
-
     // --- 4. GESTIÓN DE USUARIOS (PESTAÑA POR DEFECTO) ---
 
     // 4.1. Elementos del DOM
@@ -139,7 +69,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const userForm = document.getElementById('user-form');
 
     async function fetchUsers() {
-        const result = await apiCall('api/manage_users.php?action=list');
+        const result = await window.api.get('api/manage_users.php?action=list');
         if (result && result.success) {
             renderUsersTable(result.data);
         }
@@ -161,12 +91,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const departmentName = user.department_name || (user.role === 'superadmin' ? 'Global' : 'N/A');
 
             tr.innerHTML = `
-                <td>${escapeHtml(user.username)}</td>
-                <td>${escapeHtml(user.role)}</td>
-                <td>${escapeHtml(companyName)}</td>
-                <td>${escapeHtml(branchName)}</td>
-                <td>${escapeHtml(province)}</td>
-                <td>${escapeHtml(departmentName)}</td>
+                <td>${window.escapeHTML(user.username)}</td>
+                <td>${window.escapeHTML(user.role)}</td>
+                <td>${window.escapeHTML(companyName)}</td>
+                <td>${window.escapeHTML(branchName)}</td>
+                <td>${window.escapeHTML(province)}</td>
+                <td>${window.escapeHTML(departmentName)}</td>
                 <td>
                     <span class="status-toggle ${user.is_active ? 'active' : 'inactive'}">
                         ${user.is_active ? 'Activo' : 'Inactivo'}
@@ -230,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (!confirm('¿Eliminar este usuario?')) return;
             const id = deleteBtn.dataset.userId;
-            const result = await apiCall('api/manage_users.php', 'POST', { action: 'delete', id });
+            const result = await window.api.post('api/manage_users.php', { action: 'delete', id });
             if (result && result.success) {
                 fetchUsers();
             }
@@ -240,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (editBtn) {
             e.preventDefault();
             const id = editBtn.dataset.userId;
-            const result = await apiCall(`api/manage_users.php?action=get&id=${id}`);
+            const result = await window.api.get(`api/manage_users.php?action=get&id=${id}`);
             if (result && result.success && result.data) {
                 const user = result.data;
                 userForm.reset();
@@ -307,7 +237,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (data.id) data.id = parseInt(data.id);
 
-        const result = await apiCall('api/manage_users.php', 'POST', data);
+        const result = await window.api.post('api/manage_users.php', data);
         if (result && result.success) {
             closeModal('user-modal');
             fetchUsers();
@@ -320,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!select) return;
 
         try {
-            const result = await apiCall('api/get_admins.php');
+            const result = await window.api.get('api/get_admins.php');
             select.innerHTML = '<option value="">Ninguno (usuario sin admin)</option>';
 
             if (result.success && Array.isArray(result.data)) {
@@ -348,8 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const companySelect = document.getElementById('company_id');
         if (!companySelect) return;
         companySelect.innerHTML = '<option value="">Cargando empresas...</option>';
-        
-        const result = await apiCall('api/get_companies.php');
+        const result = await window.api.get('api/get_companies.php');
         
         if (result && result.success) {
             companySelect.innerHTML = '<option value="">Seleccionar empresa</option>';
@@ -388,7 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         branchSelect.innerHTML = '<option value="">Cargando...</option>';
-        const result = await apiCall(`api/get_branches.php?company_id=${companyId}`);
+        const result = await window.api.get(`api/get_branches.php?company_id=${companyId}`);
 
         if (result && result.success) {
             if (result.data.length === 0) {
@@ -430,7 +359,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         departmentSelect.innerHTML = '<option value="">Cargando...</option>';
-        const result = await apiCall(`api/get_departments.php?branch_id=${branchId}`);
+        const result = await window.api.get(`api/get_departments.php?branch_id=${branchId}`);
         if (result && result.success) {
             departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>';
             result.data.forEach(dep => {
@@ -447,12 +376,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const sitesContainer = document.getElementById('sites-container');
         if (!sitesContainer) return;
         try {
-            const result = await apiCall('api/manage_sites.php?action=list');
+            const result = await window.api.get('api/manage_sites.php?action=list');
             
             // Safer handling of assigned sites to prevent errors if apiCall returns null
             let assignedSiteIds = [];
             if (userId) {
-                const assignedResult = await apiCall(`api/manage_users.php?action=get_assigned_sites&id=${userId}`);
+                const assignedResult = await window.api.get(`api/manage_users.php?action=get_assigned_sites&id=${userId}`);
                 if (assignedResult && assignedResult.success) {
                     assignedSiteIds = assignedResult.data.map(s => s.id);
                 }
@@ -464,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     const checked = assignedSiteIds.includes(site.id) ? 'checked' : '';
                     html += `<div class="form-check">
                         <input type="checkbox" class="site-checkbox" id="site-${site.id}" value="${site.id}" ${checked}>
-                        <label for="site-${site.id}">${escapeHtml(site.name)}</label>
+                        <label for="site-${site.id}">${window.escapeHTML(site.name)}</label>
                     </div>`;
                 });
                 sitesContainer.innerHTML = html || '<p>No hay sitios para asignar.</p>';
@@ -482,7 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchCompanies() {
         if (!companiesTableBody) return;
-        const result = await apiCall('api/get_companies.php');
+        const result = await window.api.get('api/get_companies.php');
         if (result && result.success) {
             renderCompaniesTable(result.data);
         }
@@ -498,7 +427,7 @@ document.addEventListener('DOMContentLoaded', function() {
         companies.forEach(company => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${escapeHtml(company.name)}</td>
+                <td>${window.escapeHTML(company.name)}</td>
                 <td>${safeDate(company.created_at)}</td>
                 <td class="actions">
                     <button class="btn btn-sm btn-secondary edit-company-btn" data-id="${company.id}">Editar</button>
@@ -524,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (!confirm('¿Eliminar esta empresa?')) return;
             const id = deleteBtn.dataset.id;
-            const result = await apiCall('api/manage_companies.php', 'POST', { action: 'delete', id });
+            const result = await window.api.post('api/manage_companies.php', { action: 'delete', id });
             if (result && result.success) {
                 fetchCompanies();
                 loadCompanies();
@@ -535,7 +464,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (editBtn) {
             e.preventDefault();
             const id = editBtn.dataset.id;
-            const result = await apiCall(`api/get_company.php?id=${id}`);
+            const result = await window.api.get(`api/get_company.php?id=${id}`);
             if (result && result.success) {
                 document.getElementById('company-modal-title').textContent = 'Editar Empresa';
                 document.getElementById('company-action').value = 'edit';
@@ -551,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(companyFormEl);
         const data = Object.fromEntries(formData.entries());
         data.id = parseInt(data.id) || null;
-        const result = await apiCall('api/manage_companies.php', 'POST', data);
+        const result = await window.api.post('api/manage_companies.php', data);
         if (result && result.success) {
             closeModal('company-modal');
             fetchCompanies();
@@ -565,7 +494,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchBranches() {
         if (!branchesTableBody) return;
-        const result = await apiCall('api/get_branches.php');
+        const result = await window.api.get('api/get_branches.php');
         if (result && result.success) {
             renderBranchesTable(result.data);
         }
@@ -581,10 +510,10 @@ document.addEventListener('DOMContentLoaded', function() {
         branches.forEach(branch => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${escapeHtml(branch.name)}</td>
-                <td>${escapeHtml(branch.company_name)}</td>
-                <td>${escapeHtml(branch.country_name || 'N/A')}</td>
-                <td>${escapeHtml(branch.province)}</td>
+                <td>${window.escapeHTML(branch.name)}</td>
+                <td>${window.escapeHTML(branch.company_name)}</td>
+                <td>${window.escapeHTML(branch.country_name || 'N/A')}</td>
+                <td>${window.escapeHTML(branch.province)}</td>
                 <td class="actions">
                     <button class="btn btn-sm btn-secondary edit-branch-btn" data-id="${branch.id}">Editar</button>
                     <button class="btn btn-sm btn-danger delete-branch-btn" data-id="${branch.id}">Eliminar</button>
@@ -611,7 +540,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (!confirm('¿Eliminar esta sucursal?')) return;
             const id = deleteBtn.dataset.id;
-            const result = await apiCall('api/manage_branches.php', 'POST', { action: 'delete', id });
+            const result = await window.api.post('api/manage_branches.php', { action: 'delete', id });
             if (result && result.success) {
                 fetchBranches();
             }
@@ -621,7 +550,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (editBtn) {
             e.preventDefault();
             const id = editBtn.dataset.id;
-            const result = await apiCall(`api/get_branch.php?id=${id}`);
+            const result = await window.api.get(`api/get_branch.php?id=${id}`);
             if (result && result.success) {
                 document.getElementById('branch-modal-title').textContent = 'Editar Sucursal';
                 document.getElementById('branch-action').value = 'edit';
@@ -639,7 +568,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(branchFormEl);
         const data = Object.fromEntries(formData.entries());
         data.id = parseInt(data.id) || null;
-        const result = await apiCall('api/manage_branches.php', 'POST', data);
+        const result = await window.api.post('api/manage_branches.php', data);
         if (result && result.success) {
             closeModal('branch-modal');
             fetchBranches();
@@ -650,7 +579,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const countrySelect = document.getElementById('branch-country-id');
         if (!countrySelect) return;
         try {
-            const result = await apiCall('api/get_countries.php');
+            const result = await window.api.get('api/get_countries.php');
             if (result.success) {
                 countrySelect.innerHTML = '<option value="">Seleccionar país</option>';
                 result.data.forEach(country => {
@@ -674,7 +603,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!provinceSelect) return;
         provinceSelect.innerHTML = '<option value="">Cargando...</option>';
         try {
-            const result = await apiCall(`api/get_provinces.php?country_id=${countryId}`);
+            const result = await window.api.get(`api/get_provinces.php?country_id=${countryId}`);
             if (result.success) {
                 provinceSelect.innerHTML = '<option value="">Seleccionar provincia</option>';
                 result.data.forEach(province => {
@@ -700,7 +629,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchDepartments() {
         if (!departmentsTableBody) return;
-        const result = await apiCall('api/get_departments.php');
+        const result = await window.api.get('api/get_departments.php');
         if (result && result.success) {
             renderDepartmentsTable(result.data);
         }
@@ -716,9 +645,9 @@ document.addEventListener('DOMContentLoaded', function() {
         departments.forEach(dept => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${escapeHtml(dept.name)}</td>
-                <td>${escapeHtml(dept.company_name || 'N/A')}</td>
-                <td>${escapeHtml(dept.branch_name || 'N/A')}</td>
+                <td>${window.escapeHTML(dept.name)}</td>
+                <td>${window.escapeHTML(dept.company_name || 'N/A')}</td>
+                <td>${window.escapeHTML(dept.branch_name || 'N/A')}</td>
                 <td class="actions">
                     <button class="btn btn-sm btn-secondary edit-department-btn" data-id="${dept.id}">Editar</button>
                     <button class="btn btn-sm btn-danger delete-department-btn" data-id="${dept.id}">Eliminar</button>
@@ -743,7 +672,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const editBtn = e.target.closest('.edit-department-btn');
         if (editBtn) {
             const id = editBtn.dataset.id;
-            const result = await apiCall(`api/manage_departments.php?id=${id}`);
+            const result = await window.api.get(`api/manage_departments.php?id=${id}`);
             if (result && result.success) {
                 const dept = result.data;
                 departmentForm.reset();
@@ -761,7 +690,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (deleteBtn) {
             if (!confirm('¿Eliminar este departamento?')) return;
             const id = deleteBtn.dataset.id;
-            const result = await apiCall('api/manage_departments.php', 'POST', { action: 'delete', id: id });
+            const result = await window.api.post('api/manage_departments.php', { action: 'delete', id: id });
             if (result && result.success) {
                 fetchDepartments();
             }
@@ -773,7 +702,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(departmentForm);
         const data = Object.fromEntries(formData.entries());
         data.id = parseInt(data.id) || null;
-        const result = await apiCall('api/manage_departments.php', 'POST', data);
+        const result = await window.api.post('api/manage_departments.php', data);
         if (result && result.success) {
             closeModal('department-modal');
             fetchDepartments();
@@ -792,7 +721,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadCompaniesGeneric(selectElement, selectedId = null) {
         if (!selectElement) return;
         selectElement.innerHTML = '<option value="">Cargando...</option>';
-        const result = await apiCall('api/get_companies.php');
+        const result = await window.api.get('api/get_companies.php');
         if (result && result.success) {
             selectElement.innerHTML = '<option value="">Seleccionar empresa</option>';
             result.data.forEach(c => {
@@ -820,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         selectElement.innerHTML = '<option value="">Cargando...</option>';
-        const result = await apiCall(`api/get_branches.php?company_id=${companyId}`);
+        const result = await window.api.get(`api/get_branches.php?company_id=${companyId}`);
         if (result && result.success) {
             selectElement.innerHTML = '<option value="">Seleccionar sucursal</option>';
             result.data.forEach(b => {
@@ -841,7 +770,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function fetchSites() {
         if (!sitesTableBody) return;
-        const result = await apiCall('api/manage_sites.php?action=list');
+        const result = await window.api.get('api/manage_sites.php?action=list');
         if (result && result.success) {
             renderSitesTable(result.data);
         }
@@ -857,9 +786,9 @@ document.addEventListener('DOMContentLoaded', function() {
         sites.forEach(site => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td>${escapeHtml(site.name)}</td>
-                <td><a href="${site.url}" target="_blank">${escapeHtml(site.url)}</a></td>
-                <td>${escapeHtml(site.username)}</td>
+                <td>${window.escapeHTML(site.name)}</td>
+                <td><a href="${site.url}" target="_blank">${window.escapeHTML(site.url)}</a></td>
+                <td>${window.escapeHTML(site.username)}</td>
                 <td class="actions">
                     <button class="btn btn-sm btn-secondary edit-site-btn" data-site-id="${site.id}">Editar</button>
                     <button class="btn btn-sm btn-danger delete-site-btn" data-site-id="${site.id}">Eliminar</button>
@@ -885,7 +814,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (editBtn) {
             e.preventDefault();
             const id = editBtn.dataset.siteId;
-            const result = await apiCall(`api/manage_sites.php?action=get&id=${id}`);
+            const result = await window.api.get(`api/manage_sites.php?action=get&id=${id}`);
             if (result && result.success) {
                 const site = result.data;
                 siteForm.reset();
@@ -907,7 +836,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (!confirm('¿Eliminar este sitio? Esta acción no se puede deshacer.')) return;
             const id = deleteBtn.dataset.siteId;
-            const result = await apiCall('api/manage_sites.php', 'POST', { action: 'delete', id: id });
+            const result = await window.api.post('api/manage_sites.php', { action: 'delete', id: id });
             if (result && result.success) {
                 fetchSites();
             }
@@ -919,7 +848,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(siteForm);
         const data = Object.fromEntries(formData.entries());
         data.id = parseInt(data.id) || null;
-        const result = await apiCall('api/manage_sites.php', 'POST', data);
+        const result = await window.api.post('api/manage_sites.php', data);
         if (result && result.success) {
             closeModal('site-modal');
             fetchSites();
@@ -947,7 +876,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchUserMessages() {
         if (!messagesTableBody) return;
         try {
-            const result = await apiCall('api/get_user_messages.php');
+            const result = await window.api.get('api/get_user_messages.php');
             if (result.success) {
                 messagesTableBody.innerHTML = '';
                 if (result.data.length === 0) {
@@ -957,8 +886,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 result.data.forEach(msg => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td>${escapeHtml(msg.username)}</td>
-                        <td>${escapeHtml(msg.message)}</td>
+                        <td>${window.escapeHTML(msg.username)}</td>
+                        <td>${window.escapeHTML(msg.message)}</td>
                         <td>${safeDate(msg.created_at)}</td>
                         <td class="actions">
                             <button class="btn btn-sm btn-primary reply-btn" data-user-id="${msg.sender_id}">Responder</button>
@@ -980,7 +909,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const userId = replyBtn.dataset.userId;
             const reply = prompt('Escriba su respuesta:');
             if (reply && reply.trim()) {
-                const result = await apiCall('api/send_message.php', 'POST', {
+                const result = await window.api.post('api/send_message.php', {
                     receiver_id: userId,
                     message: reply.trim()
                 });
@@ -996,7 +925,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             if (!confirm('¿Eliminar este mensaje?')) return;
             const id = deleteMsgBtn.dataset.id;
-            const result = await apiCall('api/delete_message.php', 'POST', { message_id: id });
+            const result = await window.api.post('api/delete_message.php', { message_id: id });
             if (result && result.success) {
                 fetchUserMessages();
             }
@@ -1009,7 +938,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function fetchAuditLogs() {
         if (!auditTableBody) return;
         try {
-            const result = await apiCall('api/get_audit_logs.php');
+            const result = await window.api.get('api/get_audit_logs.php');
             if (result.success) {
                 renderAuditTable(result.data);
             }
@@ -1029,10 +958,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${log.id}</td>
-                <td>${escapeHtml(log.username || 'Sistema')}</td>
-                <td>${escapeHtml(log.action)}</td>
-                <td>${escapeHtml(log.site_name || '-')}</td>
-                <td><code>${escapeHtml(log.ip_address || 'N/A')}</code></td>
+                <td>${window.escapeHTML(log.username || 'Sistema')}</td>
+                <td>${window.escapeHTML(log.action)}</td>
+                <td>${window.escapeHTML(log.site_name || '-')}</td>
+                <td><code>${window.escapeHTML(log.ip_address || 'N/A')}</code></td>
                 <td>${safeDate(log.timestamp)}</td>
             `;
             auditTableBody.appendChild(tr);
@@ -1091,7 +1020,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Guardar en la base de datos en segundo plano
         try {
-            await apiCall('api/save_theme.php', 'POST', { theme: theme });
+            await window.api.post('api/save_theme.php', { theme: theme });
         } catch (error) {
             console.error('No se pudo guardar el tema en la base de datos:', error);
         }

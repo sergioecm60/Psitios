@@ -446,6 +446,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         </div>
     </div>
 
+    <script src="assets/js/main.js" nonce="<?= $nonce ?>" defer></script>
     <script src="assets/js/admin.js" nonce="<?= $nonce ?>" defer></script>
     <script src="assets/js/notifications_panel.js" nonce="<?= $nonce ?>" defer></script>
 </body>
