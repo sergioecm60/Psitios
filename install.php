@@ -12,12 +12,43 @@ const COLOR_YELLOW = "\033[33m";
 const COLOR_RED = "\033[31m";
 const COLOR_CYAN = "\033[36m";
 
+// Helper function to check for terminal color support
+function has_color_support() {
+    // If running on a non-Windows OS, assume color support if it's a TTY.
+    if (strtoupper(substr(PHP_OS, 0, 3)) !== 'WIN') {
+        return function_exists('posix_isatty') && @posix_isatty(STDOUT);
+    }
+
+    // On Windows, check for specific environment variables or use the PHP 7.2+ function.
+    return (function_exists('sapi_windows_vt100_support') && @sapi_windows_vt100_support(STDOUT))
+        || getenv('ANSICON') !== false
+        || getenv('ConEmuANSI') === 'ON'
+        || getenv('TERM') === 'xterm-256color';
+}
+
+// A single global check for color support to avoid re-checking.
+$supports_color = has_color_support();
+
 function writeln($text, $color = COLOR_RESET) {
-    echo $color . $text . COLOR_RESET . PHP_EOL;
+    global $supports_color;
+    if ($supports_color) {
+        echo $color . $text . COLOR_RESET . PHP_EOL;
+    } else {
+        echo $text . PHP_EOL;
+    }
 }
 
 function ask($question, $default = null) {
-    $prompt = $question . ($default ? " [" . COLOR_YELLOW . $default . COLOR_RESET . "]" : "") . ": ";
+    global $supports_color;
+    $default_text = '';
+    if ($default) {
+        if ($supports_color) {
+            $default_text = " [" . COLOR_YELLOW . $default . COLOR_RESET . "]";
+        } else {
+            $default_text = " [$default]";
+        }
+    }
+    $prompt = $question . $default_text . ": ";
     $input = readline($prompt);
     return $input ?: $default;
 }
