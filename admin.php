@@ -29,7 +29,7 @@ $nonce = base64_encode(random_bytes(16));
 
 // --- Headers de Seguridad ---
 // Previene ataques de XSS al restringir de dónde se pueden cargar los scripts.
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self'; connect-src 'self';");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'nonce-{$nonce}'; connect-src 'self';");
 // El error reporting ya está configurado en bootstrap.php, no es necesario repetirlo aquí.
 ?>
 <!DOCTYPE html>
@@ -42,6 +42,9 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     <link rel="stylesheet" href="assets/css/admin.css">
     <meta name="csrf-token" content="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>">
     <link rel="stylesheet" href="assets/css/notifications_panel.css">
+    <style nonce="<?= $nonce ?>">
+        .hidden { display: none !important; }
+    </style>
 </head>
 <body 
     data-csrf-token="<?= htmlspecialchars($csrf_token, ENT_QUOTES, 'UTF-8') ?>"
@@ -249,15 +252,15 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <input type="hidden" id="user-action" name="action">
                 <div class="form-group">
                     <label for="username">Nombre de Usuario</label>
-                    <input type="text" id="username" name="username" required>
+                    <input type="text" id="username" name="username" required autocomplete="username">
                 </div>
                 <div class="form-group">
                     <label for="password">Contraseña</label>
-                    <input type="password" id="password" name="password">
+                    <input type="password" id="password" name="password" autocomplete="new-password">
                 </div>
                 <div class="form-group">
                     <label for="role">Rol</label>
-                    <select id="role" name="role">
+                    <select id="role" name="role" autocomplete="off">
                         <option value="user">Usuario</option>
                         <option value="admin">Administrador</option>
                     </select>
@@ -267,27 +270,27 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 </div>
                 <div class="form-group">
                     <label for="company_id">Empresa</label>
-                    <select id="company_id" name="company_id">
+                    <select id="company_id" name="company_id" autocomplete="off">
                         <option value="">Seleccionar empresa</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="branch_id">Sucursal</label>
-                    <select id="branch_id" name="branch_id">
+                    <select id="branch_id" name="branch_id" autocomplete="off">
                         <option value="">Seleccionar sucursal</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="department_id">Departamento</label>
-                    <select id="department_id" name="department_id">
+                    <select id="department_id" name="department_id" autocomplete="off">
                         <option value="">Seleccionar departamento</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label>Sitios Asignados</label>
+                <fieldset class="form-group">
+                    <legend>Sitios Asignados</legend>
                     <div id="sites-container"></div>
-                </div>
-                <div class="form-group" id="admin-assignment-group" style="display: none;">
+                </fieldset>
+                <div class="form-group hidden" id="admin-assignment-group">
                     <label for="assigned_admin_id">Admin Asignado</label>
                     <select id="assigned_admin_id" name="assigned_admin_id">
                         <option value="">Ninguno (usuario sin admin)</option>
@@ -313,7 +316,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <input type="hidden" id="company-action" name="action">
                 <div class="form-group">
                     <label for="company-name">Nombre de la Empresa</label>
-                    <input type="text" id="company-name" name="name" required>
+                    <input type="text" id="company-name" name="name" required autocomplete="organization">
                 </div>
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary">Guardar</button>
@@ -335,23 +338,23 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <input type="hidden" id="branch-action" name="action">
                 <div class="form-group">
                     <label for="branch-name">Nombre</label>
-                    <input type="text" id="branch-name" name="name" required>
+                    <input type="text" id="branch-name" name="name" required autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="branch-company-id">Empresa</label>
-                    <select id="branch-company-id" name="company_id" required>
+                    <select id="branch-company-id" name="company_id" required autocomplete="off">
                         <option value="">Seleccionar empresa</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="branch-country-id">País</label>
-                    <select id="branch-country-id" name="country_id" required>
+                    <select id="branch-country-id" name="country_id" required autocomplete="off">
                         <option value="">Seleccionar país</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="branch-province">Provincia</label>
-                    <select id="branch-province" name="province" required>
+                    <select id="branch-province" name="province" required autocomplete="off">
                         <option value="">Seleccionar provincia</option>
                     </select>
                 </div>
@@ -375,17 +378,17 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <input type="hidden" id="department-action" name="action">
                 <div class="form-group">
                     <label for="department-name">Nombre del Departamento</label>
-                    <input type="text" id="department-name" name="name" required>
+                    <input type="text" id="department-name" name="name" required autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="department-company-id">Empresa</label>
-                    <select id="department-company-id" name="company_id" required>
+                    <select id="department-company-id" name="company_id" required autocomplete="off">
                         <option value="">Seleccionar empresa</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="department-branch-id">Sucursal</label>
-                    <select id="department-branch-id" name="branch_id" required>
+                    <select id="department-branch-id" name="branch_id" required autocomplete="off">
                         <option value="">Seleccionar sucursal</option>
                     </select>
                 </div>
@@ -409,11 +412,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <input type="hidden" id="site-action" name="action">
                 <div class="form-group">
                     <label for="site-name">Nombre del Sitio</label>
-                    <input type="text" id="site-name" name="name" required>
+                    <input type="text" id="site-name" name="name" required autocomplete="off">
                 </div>
                 <div class="form-group">
                     <label for="site-url">URL del Sitio</label>
-                    <input type="text" id="site-url" name="url" placeholder="ej: 192.168.0.1/misitio o https://google.com" required>
+                    <input type="text" id="site-url" name="url" placeholder="ej: 192.168.0.1/misitio o https://google.com" required autocomplete="url">
                 </div>
                 <div class="form-group">
                     <label for="site-username">Usuario</label>
@@ -427,7 +430,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                     </div>
                     <small>Deje en blanco para mantener la contraseña actual.</small>
                 </div>
-                <div class="form-group" id="site-visibility-group" style="display: none;">
+                <div class="form-group hidden" id="site-visibility-group">
                     <label for="site-visibility">Visibilidad</label>
                     <select id="site-visibility" name="visibility"><option value="private">Privado (Solo para mí)</option><option value="shared">Compartido (Para todos los admins)</option></select>
                 </div>

@@ -213,10 +213,10 @@ document.addEventListener('DOMContentLoaded', function() {
             await loadCompanies();
             const adminGroup = document.getElementById('admin-assignment-group');
             if (CURRENT_USER_ROLE === 'superadmin' && document.getElementById('role').value === 'user') {
-                adminGroup.style.display = 'block';
+                adminGroup.classList.remove('hidden');
                 loadAdmins(); // This can be async without await, not critical path
             } else {
-                adminGroup.style.display = 'none';
+                adminGroup.classList.add('hidden');
             }
         }
 
@@ -263,10 +263,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Mostrar/ocultar campo de admin asignado
                 const adminGroup = document.getElementById('admin-assignment-group');
                 if (CURRENT_USER_ROLE === 'superadmin' && user.role === 'user') {
-                    adminGroup.style.display = 'block';
+                    adminGroup.classList.remove('hidden');
                     loadAdmins(user.assigned_admin_id || null);
                 } else {
-                    adminGroup.style.display = 'none';
+                    adminGroup.classList.add('hidden');
                 }
 
                 openModal('user-modal');
@@ -340,7 +340,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     document.getElementById('role').addEventListener('change', function() {
         const adminGroup = document.getElementById('admin-assignment-group');
-        adminGroup.style.display = (CURRENT_USER_ROLE === 'superadmin' && this.value === 'user') ? 'block' : 'none';
+        adminGroup.classList.toggle('hidden', !(CURRENT_USER_ROLE === 'superadmin' && this.value === 'user'));
     });
 
     // 4.6. Carga de desplegables jerárquicos (Empresas, Sucursales, Departamentos)
@@ -875,9 +875,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('site-id').value = '';
         document.getElementById('site-action').value = 'add';
         document.getElementById('site-modal-title').textContent = 'Agregar Sitio';
-        if (CURRENT_USER_ROLE === 'superadmin') {
-            document.getElementById('site-visibility-group').style.display = 'block';
-        }
+        const visibilityGroup = document.getElementById('site-visibility-group');
+        visibilityGroup.classList.toggle('hidden', CURRENT_USER_ROLE !== 'superadmin');
         openModal('site-modal');
     });
 
@@ -897,6 +896,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('site-url').value = site.url;
                 document.getElementById('site-username').value = site.username;
                 document.getElementById('site-notes').value = site.notes;
+                const visibilityGroup = document.getElementById('site-visibility-group');
+                visibilityGroup.classList.toggle('hidden', CURRENT_USER_ROLE !== 'superadmin');
                 openModal('site-modal');
             }
         }

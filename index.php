@@ -55,11 +55,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         <form id="loginForm">
             <div class="form-group">
                 <label for="username">Usuario</label>
-                <input type="text" id="username" name="username" required>
+                <input type="text" id="username" name="username" required autocomplete="username">
             </div>
             <div class="form-group">
                 <label for="password">Contraseña</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" required autocomplete="current-password">
             </div>
             <button type="submit" class="btn-login">Iniciar Sesión</button>
         </form>
