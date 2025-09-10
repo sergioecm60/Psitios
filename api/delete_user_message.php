@@ -1,90 +1,87 @@
 <?php
 /**
  * api/delete_user_message.php
- * Permite al usuario eliminar un mensaje de su chat con el admin.
- * El mensaje se elimina solo de su vista (versión soft).
+ * Endpoint de la API para que un usuario autenticado elimine un mensaje que ha enviado.
+ * La seguridad se basa en que la consulta de eliminación solo tiene éxito si el `sender_id`
+ * del mensaje coincide con el ID del usuario que realiza la solicitud.
  */
 
+// Asegura que no haya salida de datos previa para evitar errores en la respuesta JSON.
 if (ob_get_level()) {
     ob_end_clean();
 }
 ob_start();
 
+// Carga el archivo de arranque principal que inicia la sesión y carga las configuraciones.
 require_once '../bootstrap.php';
+// Requiere que el usuario esté autenticado (cualquier rol) para poder usar esta función.
 require_auth(); // Cualquier usuario autenticado
 
+// Establece la cabecera para indicar que la respuesta será en formato JSON.
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'Método no permitido.']);
+// Función de ayuda para enviar respuestas de error JSON de forma consistente y terminar el script.
+function send_json_error($code, $message) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $message]);
+    if (ob_get_level()) ob_end_flush();
     exit;
 }
 
-// Validar CSRF
+// Verifica que la solicitud se haya hecho usando el método POST.
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    send_json_error(405, 'Método no permitido.');
+}
+
+// Valida el token CSRF para proteger contra ataques de falsificación de solicitudes entre sitios.
 $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
 if (!verify_csrf_token($csrf_token)) {
-    http_response_code(403);
-    echo json_encode(['success' => false, 'message' => 'Token CSRF inválido.']);
-    exit;
+    send_json_error(403, 'Token CSRF inválido.');
 }
 
-// Leer datos
+// Lee el cuerpo de la solicitud (que se espera sea JSON) y lo convierte en un array de PHP.
 $input = json_decode(file_get_contents('php://input'), true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    send_json_error(400, 'JSON inválido.');
+}
+
+// Obtiene y valida el ID del mensaje que se quiere eliminar.
 $message_id = filter_var($input['message_id'] ?? null, FILTER_VALIDATE_INT);
 
 if (!$message_id) {
-    http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'ID de mensaje no válido.']);
-    exit;
+    send_json_error(400, 'ID de mensaje no válido.');
 }
 
-$user_id = $_SESSION['user_id'];
-$pdo = get_pdo_connection();
-
+// Inicia el bloque principal de lógica para manejar la operación de forma segura.
 try {
-    // Verificar que el mensaje pertenece a la conversación usuario ↔ admin
-    $stmt = $pdo->prepare("
-        SELECT m.id, u.assigned_admin_id 
-        FROM messages m
-        JOIN users u ON u.id = ?
-        WHERE m.id = ? 
-          AND (m.sender_id = ? OR m.receiver_id = ?)
-          AND (m.sender_id = u.assigned_admin_id OR m.receiver_id = u.assigned_admin_id)
-    ");
-    $stmt->execute([$user_id, $message_id, $user_id, $user_id]);
-    $message = $stmt->fetch();
+    // Obtiene el ID del usuario de la sesión actual.
+    $user_id = $_SESSION['user_id'];
+    // Obtiene la conexión a la base de datos.
+    $pdo = get_pdo_connection();
 
-    if (!$message) {
-        http_response_code(404);
-        echo json_encode([
-            'success' => false,
-            'message' => 'Mensaje no encontrado o no tienes permiso para eliminarlo.'
-        ]);
-        exit;
+    // Prepara la consulta para eliminar el mensaje.
+    // Esta es una consulta atómica y segura: combina la autorización y la eliminación en un solo paso.
+    // La cláusula `AND sender_id = ?` es la clave de la seguridad, ya que asegura
+    // que un usuario solo pueda borrar los mensajes que él mismo ha enviado.
+    $stmt = $pdo->prepare("DELETE FROM messages WHERE id = ? AND sender_id = ?");
+    $stmt->execute([$message_id, $user_id]);
+
+    // `rowCount()` devuelve el número de filas afectadas. Si es mayor que 0, la eliminación fue exitosa.
+    if ($stmt->rowCount() > 0) {
+        echo json_encode(['success' => true, 'message' => 'Mensaje eliminado.']);
+    } else {
+        // Si `rowCount()` es 0, significa que no se encontró ningún mensaje con ese ID
+        // que además hubiera sido enviado por este usuario.
+        send_json_error(404, 'Mensaje no encontrado o no tienes permiso para eliminarlo.');
     }
 
-    // En lugar de borrar, marcamos como "eliminado para el usuario"
-    // (usamos una tabla de mensajes ocultos para no perder el historial del admin)
-    
-    // Opción 1: Borrar físicamente (simple)
-    $stmt = $pdo->prepare("DELETE FROM messages WHERE id = ?");
-    $stmt->execute([$message_id]);
-
-    echo json_encode([
-        'success' => true,
-        'message' => 'Mensaje eliminado.'
-    ]);
-
 } catch (Exception $e) {
+    // Captura cualquier excepción inesperada, la registra y devuelve un error genérico 500.
     error_log("Error en delete_user_message.php: " . $e->getMessage());
-    http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Error al eliminar el mensaje.'
-    ]);
+    send_json_error(500, 'Error interno del servidor al eliminar el mensaje.');
 }
 
+// Envía el contenido del buffer de salida y termina el script.
 if (ob_get_level()) {
     ob_end_flush();
 }

@@ -170,33 +170,45 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    document.getElementById('add-user-btn').addEventListener('click', () => {
+    document.getElementById('add-user-btn').addEventListener('click', async () => {
         userForm.reset();
         document.getElementById('user-id').value = '';
         document.getElementById('user-action').value = 'add';
         document.getElementById('user-modal-title').textContent = 'Agregar Usuario';
         document.getElementById('is_active').checked = true;
-        loadCompanies();
-        loadDepartments();
-        loadSitesForUser();
+
+        // Reset and enable dropdowns for the 'add' form
+        document.getElementById('company_id').disabled = false;
+        document.getElementById('branch_id').disabled = false;
+        document.getElementById('department_id').disabled = false;
+
+        // Set placeholder text
+        document.getElementById('branch_id').innerHTML = '<option value="">Seleccione una empresa primero</option>';
+        document.getElementById('department_id').innerHTML = '<option value="">Seleccione una sucursal primero</option>';
+
+        // Start loading non-critical data in parallel
+        const sitesPromise = loadSitesForUser();
 
         if (CURRENT_USER_ROLE === 'admin') {
-            document.getElementById('company_id').value = CURRENT_USER_COMPANY_ID;
-            document.getElementById('branch_id').value = CURRENT_USER_BRANCH_ID;
+            // For admin, load their specific hierarchy and disable the selects
+            await loadCompanies(CURRENT_USER_COMPANY_ID);
+            await loadBranches(CURRENT_USER_COMPANY_ID, CURRENT_USER_BRANCH_ID, CURRENT_USER_DEPARTMENT_ID);
             document.getElementById('company_id').disabled = true;
             document.getElementById('branch_id').disabled = true;
-            document.getElementById('department_id').value = CURRENT_USER_DEPARTMENT_ID;
             document.getElementById('department_id').disabled = true;
+        } else {
+            // For superadmin, just load all companies and let them choose
+            await loadCompanies();
+            const adminGroup = document.getElementById('admin-assignment-group');
+            if (CURRENT_USER_ROLE === 'superadmin' && document.getElementById('role').value === 'user') {
+                adminGroup.style.display = 'block';
+                loadAdmins(); // This can be async without await, not critical path
+            } else {
+                adminGroup.style.display = 'none';
+            }
         }
 
-        // Mostrar/ocultar campo de admin asignado al abrir el modal de agregar
-        const adminGroup = document.getElementById('admin-assignment-group');
-        if (CURRENT_USER_ROLE === 'superadmin' && document.getElementById('role').value === 'user') {
-            adminGroup.style.display = 'block';
-            loadAdmins();
-        } else {
-            adminGroup.style.display = 'none';
-        }
+        await sitesPromise; // Ensure sites are loaded before showing modal
         openModal('user-modal');
     });
 
@@ -217,7 +229,7 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             const id = editBtn.dataset.userId;
             const result = await apiCall(`api/manage_users.php?action=get&id=${id}`);
-            if (result && result.success) {
+            if (result && result.success && result.data) {
                 const user = result.data;
                 userForm.reset();
                 document.getElementById('user-modal-title').textContent = 'Editar Usuario';
@@ -228,7 +240,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('is_active').checked = user.is_active;
                 await loadCompanies(user.company_id);
                 await loadBranches(user.company_id, user.branch_id, user.department_id);
-                setTimeout(() => loadSitesForUser(user.id), 300);
+                await loadSitesForUser(user.id);
 
                 if (CURRENT_USER_ROLE === 'admin') {
                     document.getElementById('company_id').disabled = true;
@@ -246,6 +258,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
 
                 openModal('user-modal');
+            } else {
+                // Manejo de error si la API devuelve success: false o data: undefined
+                console.error('Error al obtener datos del usuario:', result);
+                alert('Error al cargar los datos del usuario. Por favor, inténtelo nuevamente.');
             }
         }
     });
@@ -319,47 +335,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const companySelect = document.getElementById('company_id');
         if (!companySelect) return;
         companySelect.innerHTML = '<option value="">Cargando empresas...</option>';
-        try {
-            const result = await apiCall('api/get_companies.php');
-            if (result.success) {
-                companySelect.innerHTML = '<option value="">Seleccionar empresa</option>';
-                result.data.forEach(company => {
-                    const option = document.createElement('option');
-                    option.value = company.id;
-                    option.textContent = company.name;
-                    if (selectedId && company.id == selectedId) option.selected = true;
-                    companySelect.appendChild(option);
-                });
-            } else {
-                companySelect.innerHTML = '<option value="">Error al cargar</option>';
-            }
-        } catch (error) {
-            companySelect.innerHTML = '<option value="">Error</option>';
+        
+        const result = await apiCall('api/get_companies.php');
+        
+        if (result && result.success) {
+            companySelect.innerHTML = '<option value="">Seleccionar empresa</option>';
+            result.data.forEach(company => {
+                const option = document.createElement('option');
+                option.value = company.id;
+                option.textContent = company.name;
+                if (selectedId && company.id == selectedId) option.selected = true;
+                companySelect.appendChild(option);
+            });
+        } else {
+            companySelect.innerHTML = '<option value="">Error al cargar</option>';
         }
     }
 
-    async function loadDepartments(selectedId = null) {
-        const select = document.getElementById('department_id');
-        if (!select) return;
-        select.innerHTML = '<option value="">Cargando...</option>';
-        try {
-            const result = await apiCall('api/get_departments.php');
-            if (result.success) {
-                select.innerHTML = '<option value="">Seleccionar departamento</option>';
-                result.data.forEach(dep => {
-                    const option = document.createElement('option');
-                    option.value = dep.id;
-                    option.textContent = dep.name;
-                    if (selectedId && dep.id == selectedId) option.selected = true;
-                    select.appendChild(option);
-                });
-            } else {
-                select.innerHTML = '<option value="">Error al cargar</option>';
-            }
-        } catch (error) {
-            select.innerHTML = '<option value="">Error</option>';
-        }
+    // This function loads ALL departments and is generally not what's needed in the user form.
+    // It's kept for other potential uses but `loadDepartmentsByBranch` is preferred.
+    async function loadAllDepartments(selectedId = null) {
+        // ... implementation if needed ...
     }
+
 
     const companySelect = document.getElementById('company_id');
     if (companySelect) {
@@ -374,12 +372,21 @@ document.addEventListener('DOMContentLoaded', function() {
         const departmentSelect = document.getElementById('department_id');
         if (!branchSelect || !departmentSelect) return;
 
-        branchSelect.innerHTML = '<option value="">Cargando...</option>';
         departmentSelect.innerHTML = '<option value="">Seleccione una sucursal</option>'; // Reset
 
-        try {
-            const result = await apiCall(`api/get_branches.php?company_id=${companyId}`);
-            if (result.success) {
+        // Handle case where no company is selected
+        if (!companyId) {
+            branchSelect.innerHTML = '<option value="">Seleccione una empresa primero</option>';
+            return;
+        }
+
+        branchSelect.innerHTML = '<option value="">Cargando...</option>';
+        const result = await apiCall(`api/get_branches.php?company_id=${companyId}`);
+
+        if (result && result.success) {
+            if (result.data.length === 0) {
+                branchSelect.innerHTML = '<option value="">No hay sucursales</option>';
+            } else {
                 branchSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
                 result.data.forEach(branch => {
                     const option = document.createElement('option');
@@ -396,8 +403,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     await loadDepartmentsByBranch(selectedBranchId, selectedDepartmentId);
                 }
             }
-        } catch (error) {
-            branchSelect.innerHTML = '<option value="">Error</option>';
+        } else {
+            branchSelect.innerHTML = '<option value="">Error al cargar</option>';
+            if (result) {
+                console.error('API Error (loadBranches):', result.message);
+            }
         }
     }
 
@@ -409,7 +419,7 @@ document.addEventListener('DOMContentLoaded', function() {
     async function loadDepartmentsByBranch(branchId, selectedId = null) {
         const departmentSelect = document.getElementById('department_id');
         if (!branchId) {
-            departmentSelect.innerHTML = '<option value="">Seleccionar departamento</option>';
+            departmentSelect.innerHTML = '<option value="">Seleccione una sucursal primero</option>';
             return;
         }
         departmentSelect.innerHTML = '<option value="">Cargando...</option>';
@@ -436,7 +446,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let assignedSiteIds = [];
             if (userId) {
                 const assignedResult = await apiCall(`api/manage_users.php?action=get_assigned_sites&id=${userId}`);
-                if (assignedResult?.success) {
+                if (assignedResult && assignedResult.success) {
                     assignedSiteIds = assignedResult.data.map(s => s.id);
                 }
             }
@@ -719,7 +729,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!departmentForm) return;
         departmentForm.reset();
         document.getElementById('department-id').value = '';
-        document.getElementById('department-action').value = 'add';
+        document.getElementById('department-action').value = 'add'; 
         document.getElementById('department-modal-title').textContent = 'Agregar Departamento';
         loadDepartmentCompanies();
         document.getElementById('department-branch-id').innerHTML = '<option value="">Seleccionar sucursal</option>';
@@ -764,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result && result.success) {
             closeModal('department-modal');
             fetchDepartments();
-            loadDepartments();
+            // No need to call loadDepartments() here, it's not used in the form.
         }
     });
 
@@ -1001,7 +1011,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>${log.id}</td>
                 <td>${escapeHtml(log.username || 'Sistema')}</td>
                 <td>${escapeHtml(log.action)}</td>
-                <td>${escapeHtml(log.service_name || '-')}</td>
+                <td>${escapeHtml(log.site_name || '-')}</td>
                 <td><code>${escapeHtml(log.ip_address || 'N/A')}</code></td>
                 <td>${safeDate(log.timestamp)}</td>
             `;

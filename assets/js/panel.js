@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const response = await fetch('api/delete_user_message.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrfToken },
-                    body: JSON.JSON.stringify({ message_id: id })
+                    body: JSON.stringify({ message_id: id })
                 }); 
                 const result = await response.json();
                 if (result.success) {
