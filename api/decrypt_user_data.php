@@ -51,9 +51,15 @@ try {
     // Determina dinámicamente el nombre de la tabla basado en el tipo de elemento.
     $table_name = ($type === 'site') ? 'user_sites' : 'user_reminders';
     
+    // Define los campos a seleccionar. 'url' solo existe en 'user_sites'.
+    $fields_to_select = 'username, password_encrypted, notes';
+    if ($type === 'site') {
+        $fields_to_select .= ', url';
+    }
+
     // Prepara la consulta para obtener los datos. La cláusula `AND user_id = ?` es crucial
     // para la seguridad, ya que asegura que un usuario solo pueda acceder a sus propios datos.
-    $stmt = $pdo->prepare("SELECT username, password_encrypted FROM {$table_name} WHERE id = ? AND user_id = ?");
+    $stmt = $pdo->prepare("SELECT {$fields_to_select} FROM {$table_name} WHERE id = ? AND user_id = ?");
     $stmt->execute([$id, $user_id]);
     $item = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -77,7 +83,12 @@ try {
     }
 
     // Si todo es correcto, envía la respuesta JSON con el nombre de usuario y la contraseña desencriptada.
-    echo json_encode(['success' => true, 'data' => ['username' => $item['username'], 'password' => $decrypted_password]]);
+    echo json_encode(['success' => true, 'data' => [
+        'username' => $item['username'],
+        'password' => $decrypted_password,
+        'url'      => $item['url'] ?? null, // Usa null coalescing por si es un reminder
+        'notes'    => $item['notes'] ?? null
+    ]]);
 
     // Captura cualquier excepción o error inesperado, lo registra y devuelve un error genérico 500.
 } catch (Throwable $e) {
