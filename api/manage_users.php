@@ -28,6 +28,96 @@ try {
     $current_user_department_id = $_SESSION['department_id'] ?? null;
 
     switch ($method) {
+        case 'GET':
+            $action = $_GET['action'] ?? null;
+            switch ($action) {
+                case 'list':
+                    // SQL para obtener todos los usuarios con nombres de sus entidades relacionadas.
+                    $sql = "SELECT u.id, u.username, u.role, u.is_active, 
+                                   c.name as company_name, b.name as branch_name, 
+                                   b.province, d.name as department_name
+                            FROM users u
+                            LEFT JOIN companies c ON u.company_id = c.id
+                            LEFT JOIN branches b ON u.branch_id = b.id
+                            LEFT JOIN departments d ON u.department_id = d.id";
+                    $params = [];
+
+                    // Si el usuario actual es un 'admin', solo muestra usuarios de su departamento.
+                    if ($current_user_role === 'admin' && $current_user_department_id) {
+                        $sql .= " WHERE u.department_id = ?";
+                        $params[] = $current_user_department_id;
+                    }
+                    
+                    $sql .= " ORDER BY u.username ASC";
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute($params);
+                    $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    // Formatear datos para consistencia en el frontend.
+                    foreach ($users as &$user) {
+                        $user['id'] = (int)$user['id'];
+                        $user['is_active'] = (bool)$user['is_active'];
+                    }
+
+                    echo json_encode(['success' => true, 'data' => $users]);
+                    break;
+
+                case 'get':
+                    $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+                    if (!$id) send_json_error_and_exit(400, 'ID de usuario inválido.');
+
+                    $sql = "SELECT id, username, role, is_active, company_id, branch_id, department_id, assigned_admin_id FROM users WHERE id = ?";
+                    $params = [$id];
+
+                    // Comprobación de seguridad: un admin solo puede obtener usuarios de su propio departamento.
+                    if ($current_user_role === 'admin' && $current_user_department_id) {
+                        $sql .= " AND department_id = ?";
+                        $params[] = $current_user_department_id;
+                    }
+
+                    $stmt = $pdo->prepare($sql);
+                    $stmt->execute($params);
+                    $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+                    if ($user) {
+                        // Formatear datos para consistencia.
+                        $user['id'] = (int)$user['id'];
+                        $user['is_active'] = (bool)$user['is_active'];
+                        $user['company_id'] = $user['company_id'] ? (int)$user['company_id'] : null;
+                        $user['branch_id'] = $user['branch_id'] ? (int)$user['branch_id'] : null;
+                        $user['department_id'] = $user['department_id'] ? (int)$user['department_id'] : null;
+                        $user['assigned_admin_id'] = $user['assigned_admin_id'] ? (int)$user['assigned_admin_id'] : null;
+                        echo json_encode(['success' => true, 'data' => $user]);
+                    } else {
+                        send_json_error_and_exit(404, 'Usuario no encontrado o sin permisos.');
+                    }
+                    break;
+                
+                case 'get_assigned_sites':
+                    $user_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+                    if (!$user_id) send_json_error_and_exit(400, 'ID de usuario inválido.');
+
+                    // Comprobación de seguridad: un admin solo puede obtener info de usuarios de su departamento.
+                    if ($current_user_role === 'admin' && $current_user_department_id) {
+                        $stmt_check = $pdo->prepare("SELECT id FROM users WHERE id = ? AND department_id = ?");
+                        $stmt_check->execute([$user_id, $current_user_department_id]);
+                        if (!$stmt_check->fetch()) {
+                            send_json_error_and_exit(403, 'No tiene permiso para ver los sitios de este usuario.');
+                        }
+                    }
+
+                    $stmt = $pdo->prepare("SELECT st.id FROM services s JOIN sites st ON s.site_id = st.id WHERE s.user_id = ?");
+                    $stmt->execute([$user_id]);
+                    $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    echo json_encode(['success' => true, 'data' => $sites]);
+                    break;
+
+                default:
+                    send_json_error_and_exit(400, 'Acción GET no válida.');
+            }
+            break;
+
         case 'POST':
             // Validar token CSRF para todas las operaciones que modifican datos.
             $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
@@ -97,15 +187,30 @@ try {
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
                         $params = [$username, $password_hash, $role, $is_active, $company_id, $branch_id, $department_id, $assigned_admin_id, $current_user_id];
                         
+                        $pdo->beginTransaction();
                         $stmt = $pdo->prepare($sql);
                         $stmt->execute($params);
+                        $user_id = (int)$pdo->lastInsertId();
+
+                        // Asignar sitios seleccionados
+                        if (!empty($input['assigned_sites']) && is_array($input['assigned_sites'])) {
+                            $stmt_assign = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
+                            foreach ($input['assigned_sites'] as $site_id) {
+                                if (filter_var($site_id, FILTER_VALIDATE_INT)) {
+                                    $stmt_assign->execute([$user_id, $site_id]);
+                                }
+                            }
+                        }
+                        $pdo->commit();
                         
-                        echo json_encode(['success' => true, 'message' => 'Usuario creado con éxito.', 'id' => (int)$pdo->lastInsertId()]);
+                        echo json_encode(['success' => true, 'message' => 'Usuario creado con éxito.', 'id' => $user_id]);
 
                     } else { // 'edit'
                         if (!$id) {
                             send_json_error_and_exit(400, 'ID de usuario no proporcionado para editar.');
                         }
+
+                        $pdo->beginTransaction();
 
                         $sql_parts = [
                             "username = ?", "role = ?", "is_active = ?", "company_id = ?",
@@ -133,6 +238,22 @@ try {
 
                         $stmt = $pdo->prepare($sql);
                         $stmt->execute($params);
+
+                        // Actualizar sitios asignados (método: borrar y re-insertar)
+                        // 1. Eliminar todas las asignaciones existentes para este usuario.
+                        $stmt_delete_services = $pdo->prepare("DELETE FROM services WHERE user_id = ?");
+                        $stmt_delete_services->execute([$id]);
+
+                        // 2. Re-insertar las nuevas asignaciones desde el formulario.
+                        if (!empty($input['assigned_sites']) && is_array($input['assigned_sites'])) {
+                            $stmt_assign = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
+                            foreach ($input['assigned_sites'] as $site_id) {
+                                if (filter_var($site_id, FILTER_VALIDATE_INT)) {
+                                    $stmt_assign->execute([$id, $site_id]);
+                                }
+                            }
+                        }
+                        $pdo->commit();
 
                         if ($stmt->rowCount() > 0) {
                             echo json_encode(['success' => true, 'message' => 'Usuario actualizado con éxito.']);
@@ -174,6 +295,7 @@ try {
                     send_json_error_and_exit(400, 'Acción POST no válida.');
             }
             break;
+
 
         default:
             send_json_error_and_exit(405, 'Método no permitido.');
