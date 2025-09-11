@@ -10,10 +10,11 @@
 require_once __DIR__ . '/../bootstrap.php';
 require_auth('admin');
 
-// Limpia cualquier salida de buffer anterior (ej. espacios en blanco en archivos incluidos)
-// para garantizar una respuesta JSON pura. Se llama después de los `require` por si
-// ellos generan alguna salida, que es la causa más común de errores de parseo JSON.
-if (ob_get_level()) ob_end_clean();
+// Limpia cualquier salida de buffer anterior
+if (ob_get_level()) {
+    ob_end_clean();
+}
+
 // Informa al cliente que la respuesta será en formato JSON.
 header('Content-Type: application/json; charset=utf-8');
 
@@ -24,6 +25,33 @@ function send_json_error(int $code, string $message): void {
     http_response_code($code);
     echo json_encode(['success' => false, 'message' => $message]);
     exit;
+}
+
+/**
+ * Actualiza las asignaciones de sitios (servicios) para un usuario.
+ * Elimina las asignaciones antiguas y crea las nuevas.
+ *
+ * @param PDO $pdo Conexión a la base de datos.
+ * @param int $userId ID del usuario.
+ * @param array $siteIds Array de IDs de sitios a asignar.
+ * @return bool True si hubo algún cambio (eliminación o inserción).
+ */
+function updateUserSiteAssignments(PDO $pdo, int $userId, array $siteIds): bool {
+    $stmt_delete = $pdo->prepare("DELETE FROM services WHERE user_id = ?");
+    $stmt_delete->execute([$userId]);
+    $were_deleted = $stmt_delete->rowCount() > 0;
+
+    $were_inserted = false;
+    if (!empty($siteIds)) {
+        $stmt_assign = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
+        foreach ($siteIds as $site_id) {
+            if (filter_var($site_id, FILTER_VALIDATE_INT)) {
+                $stmt_assign->execute([$userId, $site_id]);
+                $were_inserted = $were_inserted || ($stmt_assign->rowCount() > 0);
+            }
+        }
+    }
+    return $were_deleted || $were_inserted;
 }
 
 // --- Lógica Principal ---
@@ -39,7 +67,6 @@ try {
             $action = $_GET['action'] ?? null;
             switch ($action) {
                 case 'list':
-                    // SQL para obtener todos los usuarios con nombres de sus entidades relacionadas.
                     $sql = "SELECT u.id, u.username, u.role, u.is_active, 
                                    c.name as company_name, b.name as branch_name, 
                                    b.province, d.name as department_name
@@ -49,7 +76,6 @@ try {
                             LEFT JOIN departments d ON u.department_id = d.id";
                     $params = [];
 
-                    // Si el usuario actual es un 'admin', solo muestra usuarios de su departamento.
                     if ($current_user_role === 'admin' && $current_user_department_id) {
                         $sql .= " WHERE u.department_id = ?";
                         $params[] = $current_user_department_id;
@@ -60,7 +86,6 @@ try {
                     $stmt->execute($params);
                     $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-                    // Formatear datos para consistencia en el frontend.
                     foreach ($users as &$user) {
                         $user['id'] = (int)$user['id'];
                         $user['is_active'] = (bool)$user['is_active'];
@@ -71,12 +96,13 @@ try {
 
                 case 'get':
                     $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-                    if (!$id) send_json_error(400, 'ID de usuario inválido.');
+                    if (!$id) {
+                        send_json_error(400, 'ID de usuario inválido.');
+                    }
 
                     $sql = "SELECT id, username, role, is_active, company_id, branch_id, department_id, assigned_admin_id FROM users WHERE id = ?";
                     $params = [$id];
 
-                    // Comprobación de seguridad: un admin solo puede obtener usuarios de su propio departamento.
                     if ($current_user_role === 'admin' && $current_user_department_id) {
                         $sql .= " AND department_id = ?";
                         $params[] = $current_user_department_id;
@@ -87,7 +113,6 @@ try {
                     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
                     if ($user) {
-                        // Formatear datos para consistencia.
                         $user['id'] = (int)$user['id'];
                         $user['is_active'] = (bool)$user['is_active'];
                         $user['company_id'] = $user['company_id'] ? (int)$user['company_id'] : null;
@@ -99,12 +124,13 @@ try {
                         send_json_error(404, 'Usuario no encontrado o sin permisos.');
                     }
                     break;
-                
+
                 case 'get_assigned_sites':
                     $user_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-                    if (!$user_id) send_json_error(400, 'ID de usuario inválido.');
+                    if (!$user_id) {
+                        send_json_error(400, 'ID de usuario inválido.');
+                    }
 
-                    // Comprobación de seguridad: un admin solo puede obtener info de usuarios de su departamento.
                     if ($current_user_role === 'admin' && $current_user_department_id) {
                         $stmt_check = $pdo->prepare("SELECT id FROM users WHERE id = ? AND department_id = ?");
                         $stmt_check->execute([$user_id, $current_user_department_id]);
@@ -122,11 +148,11 @@ try {
 
                 default:
                     send_json_error(400, 'Acción GET no válida.');
+                    break;
             }
             break;
 
         case 'POST':
-            // Validar token CSRF para todas las operaciones que modifican datos.
             $csrf_token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
             if (!verify_csrf_token($csrf_token)) {
                 send_json_error(403, 'Token CSRF inválido.');
@@ -141,7 +167,6 @@ try {
             switch ($action) {
                 case 'add':
                 case 'edit':
-                    // --- Recolección y Validación de Datos ---
                     $id = filter_var($input['id'] ?? null, FILTER_VALIDATE_INT);
                     $username = trim($input['username'] ?? '');
                     $password = $input['password'] ?? null;
@@ -156,20 +181,15 @@ try {
                         send_json_error(400, 'El nombre de usuario es requerido.');
                     }
 
-                    // --- Lógica de Seguridad y Permisos ---
-                    // Un admin solo puede crear/editar usuarios dentro de su propio departamento.
                     if ($current_user_role === 'admin') {
                         if ($department_id != $current_user_department_id) {
                             send_json_error(403, 'No tiene permiso para gestionar usuarios fuera de su departamento.');
                         }
-                        // Un admin no puede crear otros admins.
                         if ($role === 'admin') {
                             send_json_error(403, 'No tiene permiso para crear usuarios administradores.');
                         }
                     }
 
-                    // --- Lógica de Negocio ---
-                    // Validar nombre de usuario duplicado.
                     $check_sql = "SELECT id FROM users WHERE username = ?";
                     $check_params = [$username];
                     if ($action === 'edit' && $id) {
@@ -182,39 +202,28 @@ try {
                         send_json_error(409, 'El nombre de usuario ya está en uso.');
                     }
 
-                    // --- Construcción de la Consulta ---
                     if ($action === 'add') {
                         if (empty($password)) {
                             send_json_error(400, 'La contraseña es requerida para crear un nuevo usuario.');
                         }
-                        // Hashear la contraseña usando la función de seguridad centralizada.
                         $password_hash = hash_password($password);
 
                         $sql = "INSERT INTO users (username, password_hash, role, is_active, company_id, branch_id, department_id, assigned_admin_id, created_by) 
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
                         $params = [$username, $password_hash, $role, $is_active, $company_id, $branch_id, $department_id, $assigned_admin_id, $current_user_id];
-                        
+
                         $pdo->beginTransaction();
                         $stmt = $pdo->prepare($sql);
                         $stmt->execute($params);
                         $user_id = (int)$pdo->lastInsertId();
 
-                        // Asignar sitios seleccionados
-                        if (!empty($input['assigned_sites']) && is_array($input['assigned_sites'])) {
-                            $stmt_assign = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
-                            foreach ($input['assigned_sites'] as $site_id) {
-                                if (filter_var($site_id, FILTER_VALIDATE_INT)) {
-                                    $stmt_assign->execute([$user_id, $site_id]);
-                                }
-                            }
-                        }
+                        updateUserSiteAssignments($pdo, $user_id, $input['assigned_sites'] ?? []);
                         $pdo->commit();
 
-                        // Registrar la acción en la bitácora de auditoría.
                         log_action($pdo, $current_user_id, null, "user_created: {$username}", $_SERVER['REMOTE_ADDR']);
                         echo json_encode(['success' => true, 'message' => 'Usuario creado con éxito.', 'id' => $user_id]);
 
-                    } else { // 'edit'
+                    } else {
                         if (!$id) {
                             send_json_error(400, 'ID de usuario no proporcionado para editar.');
                         }
@@ -227,10 +236,7 @@ try {
                         ];
                         $params = [$username, $role, $is_active, $company_id, $branch_id, $department_id, $assigned_admin_id];
 
-                        // Solo actualizar la contraseña si se proporcionó una nueva.
                         if (!empty($password)) {
-                            // **PUNTO CLAVE**: Usar la función `hash_password` para hashear la contraseña.
-                            // Este era el punto probable del error 500.
                             $password_hash = hash_password($password);
                             $sql_parts[] = "password_hash = ?";
                             $params[] = $password_hash;
@@ -239,7 +245,6 @@ try {
                         $sql = "UPDATE users SET " . implode(', ', $sql_parts) . " WHERE id = ?";
                         $params[] = $id;
 
-                        // Un admin solo puede editar usuarios de su departamento.
                         if ($current_user_role === 'admin') {
                             $sql .= " AND department_id = ?";
                             $params[] = $current_user_department_id;
@@ -249,31 +254,10 @@ try {
                         $stmt->execute($params);
 
                         $user_data_updated = $stmt->rowCount() > 0;
-
-                        // Actualizar sitios asignados (método: borrar y re-insertar)
-                        // 1. Eliminar todas las asignaciones existentes para este usuario.
-                        $stmt_delete_services = $pdo->prepare("DELETE FROM services WHERE user_id = ?");
-                        $stmt_delete_services->execute([$id]);
-                        $sites_were_deleted = $stmt_delete_services->rowCount() > 0;
-
-                        // 2. Re-insertar las nuevas asignaciones desde el formulario.
-                        $sites_were_inserted = false;
-                        if (!empty($input['assigned_sites']) && is_array($input['assigned_sites'])) {
-                            $stmt_assign = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
-                            foreach ($input['assigned_sites'] as $site_id) {
-                                if (filter_var($site_id, FILTER_VALIDATE_INT)) {
-                                    $stmt_assign->execute([$id, $site_id]);
-                                    if ($stmt_assign->rowCount() > 0) {
-                                        $sites_were_inserted = true;
-                                    }
-                                }
-                            }
-                        }
+                        $sites_changed = updateUserSiteAssignments($pdo, $id, $input['assigned_sites'] ?? []);
                         $pdo->commit();
 
-                        // Se considera éxito si se actualizó la info del usuario O si cambiaron sus sitios asignados.
-                        if ($user_data_updated || $sites_were_deleted || $sites_were_inserted) {
-                            // Registrar la acción en la bitácora de auditoría.
+                        if ($user_data_updated || $sites_changed) {
                             log_action($pdo, $current_user_id, null, "user_edited: {$username}", $_SERVER['REMOTE_ADDR']);
                             echo json_encode(['success' => true, 'message' => 'Usuario actualizado con éxito.']);
                         } else {
@@ -308,7 +292,6 @@ try {
                     $stmt->execute($params);
 
                     if ($stmt->rowCount() > 0) {
-                        // Registrar la acción en la bitácora de auditoría.
                         log_action($pdo, $current_user_id, null, "user_deleted: {$username_for_log}", $_SERVER['REMOTE_ADDR']);
                         echo json_encode(['success' => true, 'message' => 'Usuario eliminado con éxito.']);
                     } else {
@@ -318,15 +301,14 @@ try {
 
                 default:
                     send_json_error(400, 'Acción POST no válida.');
+                    break;
             }
             break;
-
 
         default:
             send_json_error(405, 'Método no permitido.');
     }
 } catch (PDOException $e) {
-    // Manejo de errores específicos de la base de datos.
     if ($e->getCode() == '23000') {
         send_json_error(409, 'Error de integridad de datos. Es posible que el nombre de usuario ya exista.');
     }
@@ -335,32 +317,3 @@ try {
     error_log("Error en manage_users.php: " . $e->getMessage());
     send_json_error(500, 'Error interno del servidor.');
 }
-```
-
-### 2. Mejora de Calidad en `panel.php`
-
-He simplificado la lógica para generar el token de seguridad en `panel.php`, eliminando código redundante y haciéndolo más claro.
-
-```diff
---- a/c:/laragon/www/Psitios/panel.php
-+++ b/c:/laragon/www/Psitios/panel.php
-@@ -14,15 +14,8 @@
- $user_theme = $user_data['theme'] ?? 'light';
- 
- $nonce = base64_encode(random_bytes(16));
--// Generar token CSRF solo si no existe para mantenerlo estable durante la sesión del usuario.
--$csrf_token = generate_csrf_token();
--// Se asegura que el token CSRF solo se genere si no existe, para mantenerlo
--// estable durante toda la sesión del usuario. Esto previene errores de validación
--// en las operaciones AJAX dentro del panel.
--if (empty($_SESSION['csrf_token'])) {
--    generate_csrf_token();
--}
--$csrf_token = $_SESSION['csrf_token'];
-+// Generar un token CSRF y asegurarse de que sea estable durante toda la sesión del usuario.
-+// La función `generate_csrf_token` ya comprueba si el token existe, por lo que
-+// es seguro llamarla aquí. Esto simplifica la lógica anterior que era redundante.
-+$csrf_token = generate_csrf_token();
- 
- // Content Security Policy (CSP) segura
- header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self'; connect-src 'self';");
