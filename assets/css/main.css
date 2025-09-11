@@ -9,14 +9,14 @@
 
 /* --- 1. GLOBAL & THEME --- */
 :root {
-    --primary-color: #007bff;
-    --secondary-color: #6c757d;
+    --primary-color: #28a745; /* Cambiado de azul a verde */
+    --secondary-color: #00213e;
     --success-color: #28a745;
     --danger-color: #dc3545;
     --warning-color: #ffc107;
     --info-color: #17a2b8;
     --light-color: #f8f9fa;
-    --dark-color: #343a40;
+    --dark-color: #001c38;
     --border-color: #dee2e6;
     --background-color: #f4f7f6;
     --card-background: #ffffff;
@@ -264,7 +264,7 @@ table tbody tr:hover {
 
 /* 3.1. Login Page (index.php) */
 .login-page {
-    background: linear-gradient(135deg, #010016 0%, #010004 50%, #2c5364 100%);
+    background: linear-gradient(135deg, #100040 0%, #2f1f88 50%, #0b0144 100%);
     min-height: 100vh;
     display: flex;
     flex-direction: column;
@@ -515,14 +515,7 @@ input:checked + .slider:before {
     border-radius: 3px;
 }
 
-/* --- Login page specific styles --- */
-.login-page {
-    background: linear-gradient(135deg, #010016 0%, #010004 50%, #2c5364 100%);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
+/* Contenedor del formulario de login */
 .login-container {
     max-width: 400px;
     margin: auto;
@@ -530,7 +523,7 @@ input:checked + .slider:before {
     background-color: var(--card-background);
     border-radius: 8px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    margin-top: 80px;
+    margin-top: 50px;
     text-align: center;
     margin-bottom: 40px; /* Aumenta el espacio sobre el pie de página */
 }

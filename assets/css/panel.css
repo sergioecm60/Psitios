@@ -62,6 +62,13 @@
     --text-color: #003366;
     --text-secondary-color: #495057;
     --border-color: #b3d9ff;
+    /* Variables de alerta para consistencia */
+    --warning-bg: #fff3cd;
+    --warning-text: #856404;
+    --warning-border: #ffeaa7;
+    --danger-bg: #f8d7da;
+    --danger-text: #721c24;
+    --danger-border: #f5c6cb;
 }
 
 /* 1.4. Tema Verde (Completado) */
@@ -77,6 +84,13 @@
     --text-color: #1a5e2a;
     --text-secondary-color: #495057;
     --border-color: #b8dbb8;
+    /* Variables de alerta para consistencia */
+    --warning-bg: #fff3cd;
+    --warning-text: #856404;
+    --warning-border: #ffeaa7;
+    --danger-bg: #f8d7da;
+    --danger-text: #721c24;
+    --danger-border: #f5c6cb;
 }
 
 /* --- 2. TABS & NAVIGATION --- */
