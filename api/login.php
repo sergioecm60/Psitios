@@ -38,10 +38,25 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 
 $username = trim($input['username'] ?? '');
 $password = $input['password'] ?? '';
+$captcha_answer = trim($input['captcha'] ?? '');
 
 if (empty($username) || empty($password)) {
     send_json_error_and_exit(400, 'Usuario y contraseña son requeridos.');
 }
+
+// --- Validación del CAPTCHA ---
+if (empty($captcha_answer)) {
+    send_json_error_and_exit(400, 'Por favor, complete la verificación.');
+}
+
+// Compara la respuesta del usuario con la almacenada en la sesión.
+if (!isset($_SESSION['captcha_answer']) || $captcha_answer != $_SESSION['captcha_answer']) {
+    unset($_SESSION['captcha_answer']); // Limpiar para el próximo intento.
+    send_json_error_and_exit(401, 'La respuesta de verificación es incorrecta.');
+}
+
+// Si el CAPTCHA es correcto, se limpia para que no pueda ser reutilizado.
+unset($_SESSION['captcha_answer']);
 
 // --- Lógica Principal de Autenticación ---
 

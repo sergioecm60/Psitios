@@ -544,6 +544,21 @@ input:checked + .slider:before {
     text-align: left;
 }
 
+.login-container .captcha-group {
+    text-align: left;
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.login-container .captcha-group label {
+    font-size: 1rem;
+    color: var(--dark-color);
+    font-weight: 600;
+}
+
 .login-container .btn-login {
     width: 100%;
     padding: 12px;

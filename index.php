@@ -61,6 +61,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <label for="password">Contraseña</label>
                 <input type="password" id="password" name="password" required autocomplete="current-password">
             </div>
+            <!-- CAPTCHA Numérico -->
+            <div class="form-group captcha-group">
+                <label for="captcha" id="captcha-question-label">Verificación...</label>
+                <input type="text" id="captcha" name="captcha" required autocomplete="off" placeholder="Respuesta">
+            </div>
             <button type="submit" class="btn-login">Iniciar Sesión</button>
         </form>
         <div id="loginError" class="error-message login-error hidden"></div>
@@ -83,6 +88,23 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     </footer>
 
     <script nonce="<?= $nonce ?>">
+        // Función para cargar la pregunta del CAPTCHA desde la API.
+        async function loadCaptcha() {
+            const captchaLabel = document.getElementById('captcha-question-label');
+            try {
+                // Se añade un timestamp para evitar que el navegador cachee la respuesta.
+                const response = await fetch('api/captcha_generator.php?' + new Date().getTime());
+                const data = await response.json();
+                if (data.question) {
+                    captchaLabel.textContent = data.question;
+                } else {
+                    captchaLabel.textContent = 'No se pudo cargar la verificación.';
+                }
+            } catch (error) {
+                captchaLabel.textContent = 'Error de conexión.';
+            }
+        }
+
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             const loginError = document.getElementById('loginError');
@@ -114,8 +136,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                     // Asegurarse de que la redirección sea a una URL relativa segura
                     window.location.href = result.redirect;
                 } else {
+                    // Si hay un error, se muestra el mensaje y se recarga el CAPTCHA.
                     loginError.textContent = result.message || 'Error desconocido.';
                     loginError.classList.remove('hidden');
+                    loadCaptcha();
+                    document.getElementById('captcha').value = ''; // Limpiar el campo
                 }
             } catch (error) {
                 console.error('Error de red o de parseo:', error);
@@ -126,6 +151,9 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 submitButton.textContent = 'Iniciar Sesión';
             }
         });
+
+        // Cargar el CAPTCHA inicial cuando la página esté lista.
+        document.addEventListener('DOMContentLoaded', loadCaptcha);
     </script>
 </body>
 </html>
