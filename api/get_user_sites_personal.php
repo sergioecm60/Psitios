@@ -55,17 +55,19 @@ try {
     } else {
         // MODO 2: Obtener todos los sitios personales del usuario.
         $stmt = $pdo->prepare(
-            "SELECT id, name
+            "SELECT id, name, url, password_encrypted IS NOT NULL as has_password
              FROM user_sites 
              WHERE user_id = ? 
              ORDER BY name ASC"
         );
         $stmt->execute([$user_id]);
         $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+ 
         // Formatear los datos para asegurar tipos consistentes en la respuesta JSON.
         foreach ($sites as &$site) {
             $site['id'] = (int)$site['id'];
+            // Asegurarse de que el frontend sepa si hay una contraseña para mostrar el botón "Ver".
+            $site['has_password'] = (bool)$site['has_password'];
         }
 
         echo json_encode(['success' => true, 'data' => $sites]);

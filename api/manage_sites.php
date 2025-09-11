@@ -133,36 +133,32 @@ try {
                     if ($stmt->fetch()) send_json_error(409, 'Ya existe un sitio con este nombre.');
 
                     // Encriptar contraseña si se proporciona
-                    $encrypted_data = null;
+                    $encrypted_password = null;
                     if ($password !== null && $password !== '') {
-                        $encrypted_data = encrypt_to_parts($password);
-                        if (!$encrypted_data) send_json_error(500, 'Error al encriptar la contraseña.');
+                        $encrypted_password = encrypt_data($password);
+                        if (!$encrypted_password) send_json_error(500, 'Error al encriptar la contraseña.');
                     }
 
                     if ($action === 'add') {
-                        $sql = "INSERT INTO sites (name, url, username, notes, created_by, department_id, password_needs_update" . ($encrypted_data ? ", password_encrypted, iv" : "") . ") VALUES (?, ?, ?, ?, ?, ?, 0" . ($encrypted_data ? ", ?, ?" : "") . ")";
+                        $sql = "INSERT INTO sites (name, url, username, notes, created_by, department_id, password_needs_update" . ($encrypted_password ? ", password_encrypted" : "") . ") VALUES (?, ?, ?, ?, ?, ?, 0" . ($encrypted_password ? ", ?" : "") . ")";
                         $params = [$name, $url, $username, $notes, $current_user_id, $department_id];
-                        if ($encrypted_data) {
-                            $params[] = $encrypted_data['ciphertext'];
-                            $params[] = $encrypted_data['iv'];
+                        if ($encrypted_password) {
+                            $params[] = $encrypted_password;
                         }
                         $stmt = $pdo->prepare($sql);
                         $stmt->execute($params);
                         echo json_encode(['success' => true, 'message' => 'Sitio creado.', 'id' => (int)$pdo->lastInsertId()]);
                     } else { // edit
                         if (!$id) send_json_error(400, 'ID de sitio no proporcionado para editar.');
-                        $sql_parts = ["name = ?", "url = ?", "username = ?", "notes = ?"];
+                        $sql_parts = ["name = ?", "url = ?", "username = ?", "notes = ?", "password_needs_update = 0"];
                         $params = [$name, $url, $username, $notes];
                         if ($user_role === 'superadmin') {
                             $sql_parts[] = "department_id = ?";
                             $params[] = $department_id;
                         }
-                        if ($encrypted_data) {
+                        if ($encrypted_password) {
                             $sql_parts[] = "password_encrypted = ?";
-                            $sql_parts[] = "iv = ?";
-                            $sql_parts[] = "password_needs_update = 0"; // Reset flag on password change
-                            $params[] = $encrypted_data['ciphertext'];
-                            $params[] = $encrypted_data['iv'];
+                            $params[] = $encrypted_password;
                         }
                         $sql = "UPDATE sites SET " . implode(', ', $sql_parts) . " WHERE id = ?";
                         $params[] = $id;
@@ -173,7 +169,7 @@ try {
                         $stmt = $pdo->prepare($sql);
                         $stmt->execute($params);
 
-                        if ($encrypted_data) {
+                        if ($encrypted_password) {
                             $stmt_services = $pdo->prepare("UPDATE services SET password_needs_update = 0 WHERE site_id = ?");
                             $stmt_services->execute([$id]);
                         }

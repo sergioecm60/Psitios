@@ -99,6 +99,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                                 <th>Título</th>
                                 <th>Contraseña</th>
                                 <th>Recordatorio</th>
+                                <th>Teléfono</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
@@ -174,10 +175,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
             <form id="reminder-form">
                 <input type="hidden" id="reminder-id" name="id">
                 <div class="form-group">
-                    <label for="reminder-type">Tipo</label>
+                    <label for="reminder-type">Tipo de Recordatorio</label>
                     <select id="reminder-type" name="type" required autocomplete="off">
                         <option value="note">Nota</option>
                         <option value="credential">Credencial</option>
+                        <option value="phone">Teléfono</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -191,6 +193,10 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 <div class="form-group credential-field">
                     <label for="reminder-password">Contraseña (dejar en blanco para no cambiar)</label>
                     <input type="password" id="reminder-password" name="password" autocomplete="new-password">
+                </div>
+                <div class="form-group phone-field">
+                    <label for="reminder-phone">Teléfono / Celular</label>
+                    <input type="tel" id="reminder-phone" name="phone" placeholder="+54 9 11 1234-5678" autocomplete="tel">
                 </div>
                 <div class="form-group">
                     <label for="reminder-notes">Nota / Descripción</label>

@@ -179,6 +179,12 @@
     overflow-y: auto;
 }
 
+/* Oculta los campos específicos del modal de agenda por defecto */
+#reminder-modal .credential-field,
+#reminder-modal .phone-field {
+    display: none;
+}
+
 /* 4.1. Modal de Chat */
 #chat-modal {
     display: none;
@@ -299,6 +305,16 @@
     transform: scale(1.05);
 }
 
+/* Estilo para el enlace del título en las tarjetas de servicio */
+.service-card h3 a {
+    color: inherit; /* Hereda el color del h3 (útil para temas) */
+    text-decoration: none;
+}
+
+.service-card h3 a:hover {
+    text-decoration: underline; /* Subraya al pasar el cursor para indicar que es un enlace */
+}
+
 /* --- 6. UTILITY & MISC CLASSES --- */
 .notification {
     background: var(--warning-bg);
@@ -405,6 +421,58 @@
 .no-reminders-cell {
     text-align: center;
     padding: 20px;
+}
+
+/* Estilos para la fila de detalles de credenciales en la agenda */
+#agenda-table .credential-details-row.hidden {
+    display: none;
+}
+
+/* La celda que contiene los detalles */
+#agenda-table .credential-details-row > td {
+    padding: 0;
+    background-color: var(--bg-body); /* Fondo ligeramente distinto para diferenciar */
+    border-top: none; /* Se fusiona visualmente con la fila superior */
+    animation: slideDown 0.3s ease-out;
+}
+
+/* El contenedor del contenido dentro de la celda */
+.credential-details-content {
+    padding: 15px 20px;
+    border-left: 4px solid var(--primary-color); /* Un acento de color */
+}
+
+.credential-details-content p {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 8px 0;
+    font-family: 'Courier New', Courier, monospace; /* Monospace para credenciales */
+    font-size: 0.95rem;
+}
+
+.credential-details-content p strong {
+    margin-right: 10px;
+    flex-shrink: 0; /* Evita que el texto "Usuario:" se encoja */
+}
+
+.credential-details-content p span {
+    flex-grow: 1;
+    word-break: break-all; /* Para contraseñas muy largas */
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Estilo para el enlace de teléfono en la tabla */
+#agenda-table a[href^="tel:"] {
+    color: inherit;
+    text-decoration: none;
+}
+#agenda-table a[href^="tel:"]:hover {
+    text-decoration: underline;
 }
 
 /* --- 8. RESPONSIVE DESIGN --- */

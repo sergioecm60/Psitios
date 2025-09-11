@@ -188,9 +188,14 @@ document.addEventListener('DOMContentLoaded', function() {
         const siteId = isAssigned ? item.site_id : item.id;
         const hasPassword = item.has_password || item.password_encrypted;
 
+        // Si el sitio personal tiene una URL, convierte el título en un enlace.
+        const nameHtml = (isPersonal && item.url)
+            ? `<a href="${item.url.startsWith('http') ? item.url : 'http://' + item.url}" target="_blank" rel="noopener noreferrer" title="Ir a ${window.escapeHTML(item.name)}">${window.escapeHTML(item.name)}</a>`
+            : window.escapeHTML(item.name);
+
         return `
             <div class="service-card">
-                <h3>${window.escapeHTML(item.name)}</h3>
+                <h3>${nameHtml}</h3>
                 ${isAssigned && item.password_needs_update ? '<p class="notification">⚠️ Contraseña pendiente</p>' : ''}
                 <div class="credentials-area">
                     ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isAssigned ? 'assigned' : 'personal'}">👁️ Ver</button>` : ''}
@@ -209,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
     /** Obtiene y renderiza la tabla de la agenda. */
     async function loadAgenda() {
         if (!agendaTableBody) return;
-        agendaTableBody.innerHTML = '<tr><td colspan="6" class="loading">Cargando agenda...</td></tr>';
+        agendaTableBody.innerHTML = '<tr><td colspan="7" class="loading">Cargando agenda...</td></tr>';
         
         const result = await window.api.get('api/get_user_reminders.php');
         agendaTableBody.innerHTML = '';
@@ -217,25 +222,62 @@ document.addEventListener('DOMContentLoaded', function() {
         if (result.success && result.data.length > 0) {
             agendaItems = result.data; // Almacena los datos para las notificaciones
             result.data.forEach(item => {
+                let icon = '📝';
+                let typeText = 'Nota';
+                switch (item.type) {
+                    case 'credential':
+                        icon = '🔑';
+                        typeText = 'Credencial';
+                        break;
+                    case 'phone':
+                        icon = '📞';
+                        typeText = 'Teléfono';
+                        break;
+                }
+
                 const tr = document.createElement('tr');
                 tr.dataset.id = item.id; // Asignar ID para notificaciones
+                tr.dataset.type = item.type;
+
+                // El botón "Mostrar" ahora apunta a una fila de detalles
+                const showButtonHtml = item.has_password 
+                    ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-target-row="details-row-${item.id}">Mostrar</button>` 
+                    : '';
+
+                // Prepara el contenido para la columna de teléfono.
+                let phoneContent = '—';
+                if (item.type === 'phone' && item.notes) {
+                    const phoneNumber = window.escapeHTML(item.notes);
+                    phoneContent = `<a href="tel:${phoneNumber}" title="Llamar a ${phoneNumber}">${phoneNumber}</a>`;
+                }
+
                 tr.innerHTML = `
                     <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed ? 'checked' : ''}></td>
-                    <td title="${item.type === 'credential' ? 'Credencial' : 'Nota'}">${item.type === 'credential' ? '🔑' : '📝'}</td>
+                    <td title="${typeText}">${icon}</td>
                     <td>${window.escapeHTML(item.title)}</td>
-                    <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-type="reminder">Mostrar</button>` : ''}</td>
+                    <td>${showButtonHtml}</td>
                     <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString('es-ES') : ''}</td>
-                    <td><button class="btn btn-sm btn-secondary edit-reminder" data-id="${item.id}">Editar</button>
+                    <td>${phoneContent}</td>
+                    <td><button class="btn btn-sm btn-secondary edit-reminder" data-id="${item.id}">Editar</button> 
                         <button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
                 `;
                 agendaTableBody.appendChild(tr);
+
+                // Si es una credencial con contraseña, añade la fila oculta para los detalles.
+                if (item.type === 'credential' && item.has_password) {
+                    const detailsRow = document.createElement('tr');
+                    detailsRow.classList.add('credential-details-row', 'hidden');
+                    detailsRow.id = `details-row-${item.id}`;
+                    detailsRow.innerHTML = `<td colspan="7"><div class="credential-details-content"></div></td>`;
+                    agendaTableBody.appendChild(detailsRow);
+                }
             });
         } else if (result.success) {
             agendaItems = [];
-            agendaTableBody.innerHTML = '<tr><td colspan="6" class="no-reminders-cell">No tienes recordatorios en tu agenda.</td></tr>';
+            agendaTableBody.innerHTML = '<tr><td colspan="7" class="no-reminders-cell">No tienes recordatorios en tu agenda.</td></tr>';
         } else {
             agendaItems = [];
-            agendaTableBody.innerHTML = `<tr><td colspan="6" class="error">❌ ${result.message || 'Error al cargar la agenda.'}</td></tr>`;
+            agendaTableBody.innerHTML = `<tr><td colspan="7" class="error">❌ ${result.message || 'Error al cargar la agenda.'}</td></tr>`;
         }
     }
 
@@ -266,20 +308,45 @@ document.addEventListener('DOMContentLoaded', function() {
         reminderForm.reset();
         document.getElementById('reminder-id').value = '';
         document.getElementById('reminder-modal-title').textContent = 'Añadir Recordatorio';
-        toggleCredentialFields(); 
+        // Establece el estado inicial del formulario a 'Nota'
+        document.getElementById('reminder-type').value = 'note';
+        updateReminderFormUI('note');
         openModal('reminder-modal');
     });
 
-    /** Muestra u oculta los campos de credenciales en el modal de agenda. */
-    function toggleCredentialFields() {
-        const type = reminderTypeSelect?.value;
-        const fields = reminderModal?.querySelectorAll('.credential-field');
-        fields?.forEach(field => {
-            field.style.display = type === 'credential' ? 'block' : 'none';
-        });
+    /**
+     * Actualiza la UI del formulario de recordatorio según el tipo seleccionado.
+     * @param {string} type - El tipo de recordatorio ('note', 'credential', 'phone').
+     */
+    function updateReminderFormUI(type) {
+        const titleLabel = document.querySelector('label[for="reminder-title"]');
+        const credentialFields = document.querySelectorAll('.credential-field');
+        const phoneField = document.querySelector('.phone-field');
+        const notesGroup = document.querySelector('label[for="reminder-notes"]').parentNode;
+
+        // Ocultar todos los campos opcionales
+        credentialFields.forEach(field => field.style.display = 'none');
+        phoneField.style.display = 'none';
+        notesGroup.style.display = 'block'; // Mostrar por defecto
+
+        switch (type) {
+            case 'credential':
+                titleLabel.textContent = 'Título';
+                credentialFields.forEach(field => field.style.display = 'block');
+                break;
+            case 'phone':
+                titleLabel.textContent = 'Nombre del Contacto';
+                phoneField.style.display = 'block';
+                notesGroup.style.display = 'none'; // Ocultar notas para teléfonos
+                break;
+            case 'note':
+            default:
+                titleLabel.textContent = 'Título';
+                break;
+        }
     }
 
-    reminderTypeSelect?.addEventListener('change', toggleCredentialFields);
+    reminderTypeSelect?.addEventListener('change', (e) => updateReminderFormUI(e.target.value));
 
     reminderForm?.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -406,9 +473,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('reminder-type').value = reminder.type;
                 document.getElementById('reminder-title').value = reminder.title;
                 document.getElementById('reminder-username').value = reminder.username || '';
-                document.getElementById('reminder-notes').value = reminder.notes || '';
                 document.getElementById('reminder-datetime').value = reminder.reminder_datetime ? reminder.reminder_datetime.substring(0, 16) : '';
-                toggleCredentialFields();
+
+                // Actualiza la UI ANTES de rellenar campos específicos
+                updateReminderFormUI(reminder.type);
+
+                // Rellena campos específicos según el tipo
+                if (reminder.type === 'phone') {
+                    // Para teléfonos, el número está en 'notes', lo ponemos en el campo 'phone'
+                    document.getElementById('reminder-phone').value = reminder.notes || '';
+                } else { // 'note' o 'credential'
+                    document.getElementById('reminder-notes').value = reminder.notes || '';
+                }
+
                 openModal('reminder-modal');
             } else {
                 alert('Error al cargar los detalles del recordatorio: ' + result.message);
@@ -418,12 +495,38 @@ document.addEventListener('DOMContentLoaded', function() {
         // Botón "Mostrar" contraseña
         const decryptBtn = e.target.closest('.decrypt-pass');
         if (decryptBtn) {
+            decryptBtn.disabled = true; // Prevenir doble clic
             const id = decryptBtn.dataset.id;
+            const targetRowId = decryptBtn.dataset.targetRow;
+            const targetRow = document.getElementById(targetRowId);
+
+            if (!targetRow) {
+                decryptBtn.disabled = false;
+                return;
+            }
+
+            // Si la fila ya está visible, la ocultamos y terminamos.
+            if (!targetRow.classList.contains('hidden')) {
+                targetRow.classList.add('hidden');
+                decryptBtn.textContent = 'Mostrar';
+                decryptBtn.disabled = false;
+                return;
+            }
+
+            // Si está oculta, la mostramos y cargamos los datos.
+            const contentDiv = targetRow.querySelector('.credential-details-content');
+            contentDiv.innerHTML = '<p>Obteniendo...</p>';
+            targetRow.classList.remove('hidden');
+            decryptBtn.textContent = 'Ocultar';
+
             const result = await window.api.post('api/decrypt_user_data.php', { id: id, type: 'reminder' });
-                if (result.success) {
-                alert(`Usuario: ${result.data.username}\nContraseña: ${result.data.password}`);
+            if (result.success) {
+                contentDiv.innerHTML = `
+                    <p><strong>👤 Usuario:</strong> <span>${window.escapeHTML(result.data.username)}</span> <button class="btn-copy" data-copy="${window.escapeHTML(result.data.username)}">📋</button></p>
+                    <p><strong>🔑 Contraseña:</strong> <span>${window.escapeHTML(result.data.password)}</span> <button class="btn-copy" data-copy="${window.escapeHTML(result.data.password)}">📋</button></p>
+                `;
                 } else {
-                alert('Error: ' + result.message);
+                contentDiv.innerHTML = `<p class="error">❌ ${result.message || 'No se pudieron obtener las credenciales.'}</p>`;
                 }
         }
 
@@ -449,6 +552,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: id
             });
         }
+
+        if (decryptBtn) decryptBtn.disabled = false;
     });
 
     // --- 8. LÓGICA DE UI (PESTAÑAS, MODALES, TEMA) ---

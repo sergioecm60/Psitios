@@ -35,7 +35,7 @@ try {
     //   3. Finalmente, por fecha de creación para un orden consistente.
     $stmt = $pdo->prepare("
         SELECT 
-            id, type, title,
+            id, type, title, notes,
             password_encrypted IS NOT NULL as has_password,
             reminder_datetime, is_completed
         FROM user_reminders 

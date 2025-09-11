@@ -3,6 +3,8 @@
 # Ignorar el directorio de dependencias de Composer.
 # Estas se deben instalar en cada servidor con `composer install`.
 /vendor/
+/logs/
+/apisutil/
 
 # Ignorar los archivos de configuración de entorno locales.
 # Estos contienen secretos y son específicos de cada máquina.
@@ -11,5 +13,4 @@
 !.env.example
 
 # Ignorar archivos de diagnóstico y temporales
-diagnose.php
-reset_admin_password.php
+

@@ -65,8 +65,20 @@ try {
             $notes = trim($input['notes'] ?? '');
             $reminder_datetime = !empty($input['reminder_datetime']) ? date('Y-m-d H:i:s', strtotime($input['reminder_datetime'])) : null;
 
-            if (empty($title) || !in_array($type, ['credential', 'note'])) {
+            if (empty($title) || !in_array($type, ['credential', 'note', 'phone'])) {
                 send_json_error_and_exit(400, 'El tipo y el título son requeridos.');
+            }
+
+            // Lógica específica para el tipo 'phone'
+            // Si el tipo es 'phone', el número de teléfono viene en su propio campo.
+            // Lo asignamos a la variable $notes para guardarlo en la columna correcta de la BD.
+            if ($type === 'phone') {
+                $phone_number = trim($input['phone'] ?? '');
+                if (empty($phone_number)) {
+                    send_json_error_and_exit(400, 'El número de teléfono es obligatorio.');
+                }
+                // Sobrescribimos la variable $notes con el número de teléfono.
+                $notes = $phone_number;
             }
 
             // Prevenir duplicados
@@ -107,7 +119,15 @@ try {
                 if ($stmt->rowCount() > 0) {
                     echo json_encode(['success' => true, 'message' => 'Recordatorio actualizado.']);
                 } else {
-                    send_json_error_and_exit(404, 'Recordatorio no encontrado o sin cambios.');
+                    // Para mejorar la experiencia, verificamos si el registro existe.
+                    // Si existe, significa que no se hicieron cambios. Esto no es un error.
+                    $check_stmt = $pdo->prepare("SELECT id FROM user_reminders WHERE id = ? AND user_id = ?");
+                    $check_stmt->execute([$id, $user_id]);
+                    if ($check_stmt->fetch()) {
+                        echo json_encode(['success' => true, 'message' => 'No se realizaron cambios.']);
+                    } else {
+                        send_json_error_and_exit(404, 'Recordatorio no encontrado.');
+                    }
                 }
             }
             break;
