@@ -12,7 +12,9 @@ $pdo = get_pdo_connection();
 // Obtener el admin asignado al usuario para el chat
 $stmt = $pdo->prepare("SELECT assigned_admin_id, theme FROM users WHERE id = ?");
 $stmt->execute([$user_id]);
-$user_data = $stmt->fetch();
+$user_data = $stmt->fetch(PDO::FETCH_ASSOC);
+// Si no se encuentran datos del usuario (p. ej. fue eliminado), usar valores por defecto seguros.
+// El operador `??` (null coalescing) se encarga de esto de forma elegante.
 $admin_id = $user_data['assigned_admin_id'] ?? null;
 $user_theme = $user_data['theme'] ?? 'light';
 
