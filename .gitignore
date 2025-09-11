@@ -12,3 +12,4 @@
 
 # Ignorar archivos de diagnóstico y temporales
 diagnose.php
+reset_admin_password.php
