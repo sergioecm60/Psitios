@@ -1,22 +1,14 @@
-# Dependencias de Composer
+# Archivo para especificar los archivos y carpetas que Git debe ignorar.
+
+# Ignorar el directorio de dependencias de Composer.
+# Estas se deben instalar en cada servidor con `composer install`.
 /vendor/
-composer.lock
 
-# Archivo de variables de entorno local. ¡Nunca subir a Git!
+# Ignorar los archivos de configuración de entorno locales.
+# Estos contienen secretos y son específicos de cada máquina.
 .env
-
-# Archivos de entorno para otros ambientes
 .env.*
 !.env.example
 
-# Logs y archivos temporales
-*.log
-logs/
-
-# Archivos de configuración de IDEs y sistema operativo
-.idea/
-.vscode/
-*.swp
-*~
-.DS_Store
-Thumbs.db
+# Ignorar archivos de diagnóstico y temporales
+diagnose.php
