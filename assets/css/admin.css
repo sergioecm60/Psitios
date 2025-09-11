@@ -161,25 +161,40 @@ tr:hover { background-color: var(--bg-hover); }
     position: fixed;
     z-index: 1000;
     left: 0; top: 0;
-    width: 100%; height: 100%;
-    overflow: auto;
+    width: 100%; 
+    height: 100%;
     background-color: rgba(0,0,0,0.5);
 }
 .modal.active {
     display: flex; /* Se muestra con flex para centrar el contenido */
     align-items: center;
     justify-content: center;
+    padding: 20px; /* Espacio para que el modal no pegue a los bordes en pantallas pequeñas */
 }
 .modal-content {
     background-color: var(--bg-container);
-    margin: 5% auto; /* Margen superior para no pegar al borde */
     padding: 20px;
     border: 1px solid var(--border-color);
     width: 90%;
-    max-width: 500px;
+    max-width: 600px; /* Un poco más de ancho para formularios complejos */
     border-radius: 8px;
+    max-height: 90vh; /* Altura máxima del 90% de la ventana */
+    overflow-y: auto; /* Permite el scroll vertical DENTRO del modal */
 }
-.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+.modal-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    border-bottom: 1px solid var(--border-color); 
+    padding-bottom: 10px; 
+    /* Estilos para que el encabezado se quede fijo al hacer scroll */
+    position: sticky;
+    top: -21px; /* Compensa el padding del .modal-content */
+    background-color: var(--bg-container);
+    z-index: 10;
+    margin: -20px -20px 10px -20px; /* Compensa el padding y añade margen inferior */
+    padding: 15px 20px;
+}
 .modal-header h2 { margin: 0; }
 .close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
 
@@ -219,6 +234,16 @@ tr:hover { background-color: var(--bg-hover); }
 
 .form-check { margin-bottom: 8px; }
 .form-actions { text-align: right; margin-top: 20px; }
+
+/* Contenedor específico para la lista de sitios en el modal de usuario */
+#user-modal #sites-container {
+    max-height: 200px; /* Limita la altura de la lista de sitios */
+    overflow-y: auto;  /* Añade scroll si la lista es muy larga */
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 10px;
+    background-color: var(--bg-body);
+}
 
 /* --- 10. UTILITY & MISC CLASSES --- */
 .hidden {

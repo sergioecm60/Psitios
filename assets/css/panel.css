@@ -329,6 +329,20 @@
     text-decoration: underline; /* Subraya al pasar el cursor para indicar que es un enlace */
 }
 
+/* Estilo para el botón de SSO */
+.btn-sso {
+    flex: 1 1 100%;
+    padding: 10px 8px;
+    background-color: var(--success-color);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-weight: 600;
+    text-align: center;
+    transition: background-color 0.2s;
+}
+.btn-sso:hover { background-color: color-mix(in srgb, var(--success-color) 85%, black); }
+
 /* --- 6. UTILITY & MISC CLASSES --- */
 .notification {
     background: var(--warning-bg);

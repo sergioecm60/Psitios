@@ -193,12 +193,17 @@ document.addEventListener('DOMContentLoaded', function() {
             ? `<a href="${item.url.startsWith('http') ? item.url : 'http://' + item.url}" target="_blank" rel="noopener noreferrer" title="Ir a ${window.escapeHTML(item.name)}">${window.escapeHTML(item.name)}</a>`
             : window.escapeHTML(item.name);
 
+        // Lógica para el botón de SSO: si el sitio se llama 'pvytgestiones', muestra un botón de acceso directo.
+        const isPbytSite = isPersonal && item.name.toLowerCase() === 'pvytgestiones';
+        const ssoButton = `<a href="auth/sso_pvyt.php?id=${id}" class="btn-sso">🔐 Acceder (SSO)</a>`;
+        const viewButton = hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isAssigned ? 'assigned' : 'personal'}">👁️ Ver</button>` : '';
+
         return `
             <div class="service-card">
                 <h3>${nameHtml}</h3>
                 ${isAssigned && item.password_needs_update ? '<p class="notification">⚠️ Contraseña pendiente</p>' : ''}
                 <div class="credentials-area">
-                    ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isAssigned ? 'assigned' : 'personal'}">👁️ Ver</button>` : ''}
+                    ${isPbytSite ? ssoButton : viewButton}
                     ${isAssigned ? `<button class="btn-notify-expired" data-id="${id}" ${item.password_needs_update ? 'disabled' : ''}>⏳ Notificar</button>` : ''}
                     ${isAssigned ? `<button class="btn-report-problem" data-site-id="${siteId}">🚨 Reportar</button>` : ''}
                     ${isPersonal ? `<button class="btn btn-sm btn-secondary btn-edit-site" data-id="${id}" data-type="personal">✏️ Editar</button>` : ''}
