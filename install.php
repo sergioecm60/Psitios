@@ -167,7 +167,8 @@ try {
 
 writeln("\n[Paso 3 de 5] Generando archivo de configuración .env", COLOR_CYAN);
 
-$encryption_key = base64_encode(random_bytes(32));
+// Generar una clave de cifrado de 256 bits (32 bytes) y codificarla en Base64.
+$encryption_key = base64_encode(random_bytes(32)); 
 
 $env_content = <<<EOT
 # Archivo de configuración generado automáticamente por install.php

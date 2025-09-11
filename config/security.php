@@ -17,10 +17,19 @@ function get_encryption_key(): string
 {
     static $key = null;
     if ($key === null) {
-        $key = $_ENV['ENCRYPTION_KEY'] ?? '';
-        if (mb_strlen($key, '8bit') !== 32) {
+        $base64_key = $_ENV['ENCRYPTION_KEY'] ?? '';
+        if (empty($base64_key)) {
+            error_log('CRITICAL: ENCRYPTION_KEY no está definida en .env.');
+            throw new Exception('La clave de cifrado no está configurada correctamente. Contacte al administrador.');
+        }
+
+        // Decodificar la clave de Base64 a su forma binaria.
+        $key = base64_decode($base64_key, true);
+
+        // Validar que la clave decodificada tenga exactamente 32 bytes (256 bits).
+        if ($key === false || mb_strlen($key, '8bit') !== 32) {
             // En un entorno real, esto debería solo loguear el error y no exponer detalles.
-            error_log('CRITICAL: ENCRYPTION_KEY no está definida en .env o no tiene 32 bytes.');
+            error_log('CRITICAL: ENCRYPTION_KEY en .env debe ser una cadena codificada en base64 que resulte en 32 bytes de datos binarios.');
             throw new Exception('La clave de cifrado no está configurada correctamente. Contacte al administrador.');
         }
     }
