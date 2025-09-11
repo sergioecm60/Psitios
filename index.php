@@ -36,6 +36,7 @@ if (isset($_SESSION['user_id'])) {
 }
 
 // --- Headers de Seguridad ---
+header('Content-Type: text/html; charset=utf-8');
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self';");
 ?>
 <!DOCTYPE html>

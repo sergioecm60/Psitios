@@ -216,155 +216,350 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // --- 6. LÓGICA DE LA PESTAÑA "MI AGENDA" ---
 
-    /** Obtiene y renderiza la tabla de la agenda. */
-    async function loadAgenda() {
-        if (!agendaTableBody) return;
-        agendaTableBody.innerHTML = '<tr><td colspan="7" class="loading">Cargando agenda...</td></tr>';
-        
-        const result = await window.api.get('api/get_user_reminders.php');
-        agendaTableBody.innerHTML = '';
-        
-        if (result.success && result.data.length > 0) {
-            agendaItems = result.data; // Almacena los datos para las notificaciones
-            result.data.forEach(item => {
-                let icon = '📝';
-                let typeText = 'Nota';
-                switch (item.type) {
-                    case 'credential':
-                        icon = '🔑';
-                        typeText = 'Credencial';
-                        break;
-                    case 'phone':
-                        icon = '📞';
-                        typeText = 'Teléfono';
-                        break;
-                }
+    class AgendaManager {
+        constructor() {
+            this.agendaTable = document.getElementById('agenda-table');
+            this.searchInput = document.getElementById('agenda-search-input');
+            this.typeFilter = document.getElementById('agenda-type-filter');
+            this.addBtn = document.getElementById('add-reminder-btn');
+            this.reminderForm = document.getElementById('reminder-form');
+            this.reminderTypeSelect = document.getElementById('reminder-type');
+            this.sortable = null;
+            this.debounceTimer = null;
+
+            // Estado para notificaciones
+            this.notifiedReminders = new Set(JSON.parse(localStorage.getItem('notifiedReminders') || '[]'));
+        }
+
+        init() {
+            this.bindEvents();
+            this.loadReminders();
+        }
+
+        bindEvents() {
+            // Búsqueda con debounce para no sobrecargar el servidor
+            this.searchInput.addEventListener('input', () => {
+                clearTimeout(this.debounceTimer);
+                this.debounceTimer = setTimeout(() => this.loadReminders(), 300);
+            });
+
+            // Filtro por tipo
+            this.typeFilter.addEventListener('change', () => this.loadReminders());
+
+            // Botón de agregar
+            this.addBtn.addEventListener('click', () => this.openAddModal());
+
+            // Delegación de eventos para botones de acción en la tabla
+            this.agendaTable.addEventListener('click', (e) => {
+                const target = e.target;
+                if (target.closest('.pin-btn')) this.togglePin(target.closest('.pin-btn').dataset.id);
+                if (target.closest('.edit-reminder')) this.openEditModal(target.closest('.edit-reminder').dataset.id);
+                if (target.closest('.delete-reminder')) this.deleteReminder(target.closest('.delete-reminder').dataset.id);
+                if (target.closest('.complete-reminder')) this.toggleComplete(target.closest('.complete-reminder').dataset.id);
+                if (target.closest('.decrypt-pass')) this.decryptReminderPassword(target.closest('.decrypt-pass'));
+            });
+
+            // Listeners para el formulario modal de recordatorios
+            this.reminderTypeSelect?.addEventListener('change', (e) => this.updateReminderFormUI(e.target.value));
+            this.reminderForm?.addEventListener('submit', (e) => this.handleReminderFormSubmit(e));
+        }
+
+        async loadReminders() {
+            if (!this.agendaTable) return;
+            // Limpia los `tbody` existentes y muestra el mensaje de carga en un nuevo `tbody`.
+            this.agendaTable.querySelectorAll('tbody').forEach(tbody => tbody.remove());
+            const loadingBody = document.createElement('tbody');
+            loadingBody.innerHTML = `<tr><td colspan="8" class="loading">Cargando agenda...</td></tr>`;
+            this.agendaTable.appendChild(loadingBody);
+
+            const searchTerm = this.searchInput.value;
+            const typeFilter = this.typeFilter.value;
+            
+            // Construir la URL relativa con parámetros de búsqueda
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+            if (typeFilter) params.append('type', typeFilter);
+            const queryString = params.toString();
+            const endpoint = `api/get_user_reminders.php${queryString ? '?' + queryString : ''}`;
+
+            const result = await window.api.get(endpoint);
+
+            if (result.success) {
+                agendaItems = result.data; // Actualiza la variable global para las notificaciones
+                this.renderTable(result.data);
+            } else {
+                agendaItems = [];
+                // Limpia el `tbody` de carga y muestra el error en uno nuevo.
+                this.agendaTable.querySelectorAll('tbody').forEach(tbody => tbody.remove());
+                const errorBody = document.createElement('tbody');
+                errorBody.innerHTML = `<tr><td colspan="8" class="error">❌ ${result.message || 'Error al cargar la agenda.'}</td></tr>`;
+                this.agendaTable.appendChild(errorBody);
+            }
+        }
+
+        renderTable(reminders) {
+            // Limpia cualquier contenido anterior (carga, error, datos viejos).
+            this.agendaTable.querySelectorAll('tbody').forEach(tbody => tbody.remove());
+
+            if (reminders.length === 0) {
+                const emptyBody = document.createElement('tbody');
+                emptyBody.innerHTML = `<tr><td colspan="8">No se encontraron recordatorios.</td></tr>`;
+                this.agendaTable.appendChild(emptyBody);
+                return;
+            }
+
+            reminders.forEach(item => {
+                const typeInfo = this.getTypeInfo(item.type);
+                const isCompleted = item.is_completed;
+                const isPinned = item.is_pinned;
+
+                // 1. Crea un nuevo <tbody> para cada recordatorio, que actuará como un grupo arrastrable.
+                const reminderGroup = document.createElement('tbody');
+                reminderGroup.className = 'reminder-group';
 
                 const tr = document.createElement('tr');
-                tr.dataset.id = item.id; // Asignar ID para notificaciones
-                tr.dataset.type = item.type;
+                tr.dataset.id = item.id;
+                tr.className = isCompleted ? 'completed' : '';
 
-                // El botón "Mostrar" ahora apunta a una fila de detalles
-                const showButtonHtml = item.has_password 
-                    ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-target-row="details-row-${item.id}">Mostrar</button>` 
-                    : '';
-
-                // Prepara el contenido para la columna de teléfono.
-                let phoneContent = '—';
+                let notesContent = '—';
                 if (item.type === 'phone' && item.notes) {
                     const phoneNumber = window.escapeHTML(item.notes);
-                    phoneContent = `<a href="tel:${phoneNumber}" title="Llamar a ${phoneNumber}">${phoneNumber}</a>`;
+                    notesContent = `<a href="tel:${phoneNumber}" title="Llamar a ${phoneNumber}">${phoneNumber}</a>`;
+                } else if (item.notes) {
+                    notesContent = window.escapeHTML(item.notes.substring(0, 50) + (item.notes.length > 50 ? '...' : ''));
                 }
 
                 tr.innerHTML = `
-                    <td><input type="checkbox" class="complete-reminder" data-id="${item.id}" ${item.is_completed ? 'checked' : ''}></td>
-                    <td title="${typeText}">${icon}</td>
-                    <td>${window.escapeHTML(item.title)}</td>
-                    <td>${showButtonHtml}</td>
-                    <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString('es-ES') : ''}</td>
-                    <td>${phoneContent}</td>
-                    <td><button class="btn btn-sm btn-secondary edit-reminder" data-id="${item.id}">Editar</button> 
-                        <button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button></td>
+                    <td class="drag-handle" title="Arrastrar para reordenar">☰</td>
+                    <td class="pin-cell">
+                        <button class="pin-btn ${isPinned ? 'pinned' : ''}" data-id="${item.id}" title="${isPinned ? 'Desfijar' : 'Fijar'}">${isPinned ? '📌' : '📍'}</button>
+                    </td>
+                    <td title="${typeInfo.label}">${typeInfo.icon}</td>
+                    <td>
+                        <input type="checkbox" class="complete-reminder" data-id="${item.id}" ${isCompleted ? 'checked' : ''} title="Marcar como completado">
+                        ${window.escapeHTML(item.title)}
+                    </td>
+                    <td>${item.has_password ? `<button class="btn btn-sm btn-secondary decrypt-pass" data-id="${item.id}" data-target-row="details-row-${item.id}">Mostrar</button>` : '—'}</td>
+                    <td>${notesContent}</td>
+                    <td>${item.reminder_datetime ? new Date(item.reminder_datetime).toLocaleString('es-ES') : '—'}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-secondary edit-reminder" data-id="${item.id}">Editar</button> 
+                        <button class="btn btn-sm btn-danger delete-reminder" data-id="${item.id}">Eliminar</button>
+                    </td>
                 `;
-                agendaTableBody.appendChild(tr);
+                // 2. Añade la fila principal al grupo.
+                reminderGroup.appendChild(tr);
 
-                // Si es una credencial con contraseña, añade la fila oculta para los detalles.
                 if (item.type === 'credential' && item.has_password) {
                     const detailsRow = document.createElement('tr');
                     detailsRow.classList.add('credential-details-row', 'hidden');
                     detailsRow.id = `details-row-${item.id}`;
-                    detailsRow.innerHTML = `<td colspan="7"><div class="credential-details-content"></div></td>`;
-                    agendaTableBody.appendChild(detailsRow);
+                    detailsRow.innerHTML = `<td colspan="8"><div class="credential-details-content"></div></td>`;
+                    // 3. Añade la fila de detalles al MISMO grupo.
+                    reminderGroup.appendChild(detailsRow);
+                }
+
+                // 4. Añade el grupo completo (el nuevo tbody) a la tabla principal.
+                this.agendaTable.appendChild(reminderGroup);
+            });
+
+            this.initSortable();
+        }
+
+        initSortable() {
+            if (this.sortable) {
+                this.sortable.destroy();
+            }
+            // Inicializa SortableJS en el elemento <table>, no en el <tbody>.
+            this.sortable = new Sortable(this.agendaTable, {
+                animation: 150,
+                handle: '.drag-handle',
+                draggable: 'tbody', // Especifica que los elementos arrastrables son los <tbody>.
+                onEnd: async (evt) => {
+                    const orderedIds = Array.from(this.agendaTable.querySelectorAll('tbody.reminder-group tr[data-id]')).map(tr => tr.dataset.id);
+                    const result = await window.api.post('api/update_reminder_order.php', { order: orderedIds });
+                    if (!result.success) {
+                        alert('Error al guardar el nuevo orden.');
+                        this.loadReminders(); // Recargar para revertir el cambio visual
+                    }
                 }
             });
-        } else if (result.success) {
-            agendaItems = [];
-            agendaTableBody.innerHTML = '<tr><td colspan="7" class="no-reminders-cell">No tienes recordatorios en tu agenda.</td></tr>';
-        } else {
-            agendaItems = [];
-            agendaTableBody.innerHTML = `<tr><td colspan="7" class="error">❌ ${result.message || 'Error al cargar la agenda.'}</td></tr>`;
+        }
+
+        async togglePin(id) {
+            const result = await window.api.post('api/toggle_reminder_pin.php', { id });
+            if (result.success) {
+                this.loadReminders(); // Recargar para que el orden se actualice
+            } else {
+                alert('Error al fijar el recordatorio.');
+            }
+        }
+
+        async deleteReminder(id) {
+            if (!confirm('¿Eliminar este recordatorio?')) return;
+            const result = await window.api.post('api/delete_user_reminder.php', { id });
+            if (result.success) {
+                this.loadReminders();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        async handleReminderFormSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            const result = await window.api.post('api/save_user_reminder.php', data);
+            if (result.success) {
+                closeModal('reminder-modal');
+                // En lugar de un evento, llamamos directamente a la recarga.
+                this.loadReminders();
+            } else {
+                alert('Error: ' + result.message);
+            }
+        }
+
+        async toggleComplete(id) {
+            await window.api.post('api/save_user_reminder.php', { action: 'toggle_complete', id });
+            // Recargamos para que el orden se actualice (completados van al final)
+            this.loadReminders();
+        }
+
+        openAddModal() {
+            reminderForm.reset();
+            document.getElementById('reminder-id').value = '';
+            document.getElementById('reminder-modal-title').textContent = 'Añadir Recordatorio';
+            this.updateReminderFormUI('note');
+            openModal('reminder-modal');
+        }
+
+        async openEditModal(id) {
+            const result = await window.api.get(`api/get_user_reminder_details.php?id=${id}`);
+            if (result.success) {
+                const reminder = result.data;
+                reminderForm.reset();
+                document.getElementById('reminder-modal-title').textContent = 'Editar Recordatorio';
+                document.getElementById('reminder-id').value = reminder.id;
+                document.getElementById('reminder-type').value = reminder.type;
+                document.getElementById('reminder-title').value = reminder.title;
+                document.getElementById('reminder-username').value = reminder.username || '';
+                document.getElementById('reminder-datetime').value = reminder.reminder_datetime ? reminder.reminder_datetime.substring(0, 16) : '';
+
+                this.updateReminderFormUI(reminder.type);
+
+                if (reminder.type === 'phone') {
+                    document.getElementById('reminder-phone').value = reminder.notes || '';
+                } else {
+                    document.getElementById('reminder-notes').value = reminder.notes || '';
+                }
+
+                openModal('reminder-modal');
+            } else {
+                alert('Error al cargar los detalles del recordatorio: ' + result.message);
+            }
+        }
+
+        getTypeInfo(type) {
+            const types = {
+                note: { icon: '📝', label: 'Nota' },
+                credential: { icon: '🔑', label: 'Credencial' },
+                phone: { icon: '📞', label: 'Teléfono' }
+            };
+            return types[type] || { icon: '❓', label: 'Desconocido' };
+        }
+
+        updateReminderFormUI(type) {
+            const titleLabel = document.querySelector('label[for="reminder-title"]');
+            const credentialFields = document.querySelectorAll('.credential-field');
+            const phoneField = document.querySelector('.phone-field');
+            const notesGroup = document.querySelector('label[for="reminder-notes"]').parentNode;
+    
+            // Ocultar todos los campos opcionales
+            credentialFields.forEach(field => field.style.display = 'none');
+            phoneField.style.display = 'none';
+            notesGroup.style.display = 'block'; // Mostrar por defecto
+    
+            switch (type) {
+                case 'credential':
+                    titleLabel.textContent = 'Título';
+                    credentialFields.forEach(field => field.style.display = 'block');
+                    break;
+                case 'phone':
+                    titleLabel.textContent = 'Nombre del Contacto';
+                    phoneField.style.display = 'block';
+                    notesGroup.style.display = 'none'; // Ocultar notas para teléfonos
+                    break;
+                case 'note':
+                default:
+                    titleLabel.textContent = 'Título';
+                    break;
+            }
+        }
+
+        async decryptReminderPassword(decryptBtn) {
+            decryptBtn.disabled = true; // Prevenir doble clic
+            const id = decryptBtn.dataset.id;
+            const targetRowId = decryptBtn.dataset.targetRow;
+            const targetRow = document.getElementById(targetRowId);
+
+            if (!targetRow) {
+                console.error('Fila de detalles no encontrada:', targetRowId);
+                decryptBtn.disabled = false;
+                return;
+            }
+
+            if (!targetRow.classList.contains('hidden')) {
+                targetRow.classList.add('hidden');
+                decryptBtn.textContent = 'Mostrar';
+                decryptBtn.disabled = false;
+                return;
+            }
+
+            const contentDiv = targetRow.querySelector('.credential-details-content');
+            contentDiv.innerHTML = '<p>Obteniendo...</p>';
+            targetRow.classList.remove('hidden');
+            decryptBtn.textContent = 'Ocultar';
+
+            const decryptResult = await window.api.post('api/decrypt_user_data.php', { id: id, type: 'reminder' });
+            if (decryptResult.success) {
+                contentDiv.innerHTML = `
+                    <p><strong>👤 Usuario:</strong> <span>${window.escapeHTML(decryptResult.data.username)}</span> <button class="btn-copy" data-copy="${window.escapeHTML(decryptResult.data.username)}">📋</button></p>
+                    <p><strong>🔑 Contraseña:</strong> <span>${window.escapeHTML(decryptResult.data.password)}</span> <button class="btn-copy" data-copy="${window.escapeHTML(decryptResult.data.password)}">📋</button></p>
+                `;
+            } else {
+                contentDiv.innerHTML = `<p class="error">❌ ${decryptResult.message || 'No se pudieron obtener las credenciales.'}</p>`;
+            }
+            decryptBtn.disabled = false;
+        }
+
+        checkReminders() {
+            const now = new Date();
+            agendaItems.forEach(async (item) => {
+                if (!item.id || this.notifiedReminders.has(String(item.id)) || !item.reminder_datetime || item.is_completed) {
+                    return;
+                }
+                const reminderTime = new Date(item.reminder_datetime);
+                if (isNaN(reminderTime.getTime()) || reminderTime > now) {
+                    return;
+                }
+                this.notifiedReminders.add(String(item.id));
+                localStorage.setItem('notifiedReminders', JSON.stringify(Array.from(this.notifiedReminders)));
+                const result = await window.api.get(`api/get_user_reminder_details.php?id=${item.id}`);
+                this.showReminderAlert(result.success ? result.data : { title: item.title, notes: '(No se pudieron cargar los detalles)' });
+            });
+        }
+
+        showReminderAlert(reminder) {
+            const modal = document.getElementById('reminder-alert-modal');
+            const body = document.getElementById('reminder-alert-body');
+            if (!modal || !body) return;
+            let message = `<h3>${window.escapeHTML(reminder.title)}</h3>`;
+            if (reminder.username) message += `<p><strong>Usuario:</strong> ${window.escapeHTML(reminder.username)}</p>`;
+            if (reminder.notes) message += `<p><strong>Nota:</strong> ${window.escapeHTML(reminder.notes)}</p>`;
+            body.innerHTML = message;
+            openModal('reminder-alert-modal');
         }
     }
-
-    // 6.1. Event Listeners de la Agenda
-    document.getElementById('add-user-site-btn')?.addEventListener('click', () => {
-        const form = document.getElementById('user-site-form');
-        form.reset();
-        document.getElementById('user-site-id').value = '';
-        document.getElementById('user-site-modal-title').textContent = 'Agregar Sitio Personal';
-        openModal('user-site-modal');
-    });
-
-    document.getElementById('user-site-form')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        const result = await window.api.post('api/save_user_site.php', data);
-        if (result.success) {
-            closeModal('user-site-modal');
-            fetchUserSites();
-        } else {
-            alert('Error: ' + result.message);
-        }
-    });
-
-    document.getElementById('add-reminder-btn')?.addEventListener('click', () => {
-        const reminderForm = document.getElementById('reminder-form');
-        reminderForm.reset();
-        document.getElementById('reminder-id').value = '';
-        document.getElementById('reminder-modal-title').textContent = 'Añadir Recordatorio';
-        // Establece el estado inicial del formulario a 'Nota'
-        document.getElementById('reminder-type').value = 'note';
-        updateReminderFormUI('note');
-        openModal('reminder-modal');
-    });
-
-    /**
-     * Actualiza la UI del formulario de recordatorio según el tipo seleccionado.
-     * @param {string} type - El tipo de recordatorio ('note', 'credential', 'phone').
-     */
-    function updateReminderFormUI(type) {
-        const titleLabel = document.querySelector('label[for="reminder-title"]');
-        const credentialFields = document.querySelectorAll('.credential-field');
-        const phoneField = document.querySelector('.phone-field');
-        const notesGroup = document.querySelector('label[for="reminder-notes"]').parentNode;
-
-        // Ocultar todos los campos opcionales
-        credentialFields.forEach(field => field.style.display = 'none');
-        phoneField.style.display = 'none';
-        notesGroup.style.display = 'block'; // Mostrar por defecto
-
-        switch (type) {
-            case 'credential':
-                titleLabel.textContent = 'Título';
-                credentialFields.forEach(field => field.style.display = 'block');
-                break;
-            case 'phone':
-                titleLabel.textContent = 'Nombre del Contacto';
-                phoneField.style.display = 'block';
-                notesGroup.style.display = 'none'; // Ocultar notas para teléfonos
-                break;
-            case 'note':
-            default:
-                titleLabel.textContent = 'Título';
-                break;
-        }
-    }
-
-    reminderTypeSelect?.addEventListener('change', (e) => updateReminderFormUI(e.target.value));
-
-    reminderForm?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-        const result = await window.api.post('api/save_user_reminder.php', data);
-        if (result.success) {
-            closeModal('reminder-modal');
-            loadAgenda();
-        } else {
-            alert('Error: ' + result.message);
-        }
-    });
 
     // --- 7. MANEJADORES DE EVENTOS DELEGADOS ---
     // Un solo listener en el contenedor principal para manejar clics en botones dinámicos.
@@ -462,103 +657,17 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // 7.6. Listeners para la tabla de Agenda
-    agendaTableBody?.addEventListener('click', async (e) => {
-        // Botón "Editar" recordatorio
-        const editBtn = e.target.closest('.edit-reminder');
-        if (editBtn) {
-            const id = editBtn.dataset.id;
-            const result = await window.api.get(`api/get_user_reminder_details.php?id=${id}`);
-            if (result.success) {
-                const reminder = result.data;
-                const form = document.getElementById('reminder-form');
-                form.reset();
-                document.getElementById('reminder-modal-title').textContent = 'Editar Recordatorio';
-                document.getElementById('reminder-id').value = reminder.id;
-                document.getElementById('reminder-type').value = reminder.type;
-                document.getElementById('reminder-title').value = reminder.title;
-                document.getElementById('reminder-username').value = reminder.username || '';
-                document.getElementById('reminder-datetime').value = reminder.reminder_datetime ? reminder.reminder_datetime.substring(0, 16) : '';
-
-                // Actualiza la UI ANTES de rellenar campos específicos
-                updateReminderFormUI(reminder.type);
-
-                // Rellena campos específicos según el tipo
-                if (reminder.type === 'phone') {
-                    // Para teléfonos, el número está en 'notes', lo ponemos en el campo 'phone'
-                    document.getElementById('reminder-phone').value = reminder.notes || '';
-                } else { // 'note' o 'credential'
-                    document.getElementById('reminder-notes').value = reminder.notes || '';
-                }
-
-                openModal('reminder-modal');
-            } else {
-                alert('Error al cargar los detalles del recordatorio: ' + result.message);
-            }
+    document.getElementById('user-site-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const data = Object.fromEntries(formData.entries());
+        const result = await window.api.post('api/save_user_site.php', data);
+        if (result.success) {
+            closeModal('user-site-modal');
+            fetchUserSites();
+        } else {
+            alert('Error: ' + result.message);
         }
-
-        // Botón "Mostrar" contraseña
-        const decryptBtn = e.target.closest('.decrypt-pass');
-        if (decryptBtn) {
-            decryptBtn.disabled = true; // Prevenir doble clic
-            const id = decryptBtn.dataset.id;
-            const targetRowId = decryptBtn.dataset.targetRow;
-            const targetRow = document.getElementById(targetRowId);
-
-            if (!targetRow) {
-                decryptBtn.disabled = false;
-                return;
-            }
-
-            // Si la fila ya está visible, la ocultamos y terminamos.
-            if (!targetRow.classList.contains('hidden')) {
-                targetRow.classList.add('hidden');
-                decryptBtn.textContent = 'Mostrar';
-                decryptBtn.disabled = false;
-                return;
-            }
-
-            // Si está oculta, la mostramos y cargamos los datos.
-            const contentDiv = targetRow.querySelector('.credential-details-content');
-            contentDiv.innerHTML = '<p>Obteniendo...</p>';
-            targetRow.classList.remove('hidden');
-            decryptBtn.textContent = 'Ocultar';
-
-            const result = await window.api.post('api/decrypt_user_data.php', { id: id, type: 'reminder' });
-            if (result.success) {
-                contentDiv.innerHTML = `
-                    <p><strong>👤 Usuario:</strong> <span>${window.escapeHTML(result.data.username)}</span> <button class="btn-copy" data-copy="${window.escapeHTML(result.data.username)}">📋</button></p>
-                    <p><strong>🔑 Contraseña:</strong> <span>${window.escapeHTML(result.data.password)}</span> <button class="btn-copy" data-copy="${window.escapeHTML(result.data.password)}">📋</button></p>
-                `;
-                } else {
-                contentDiv.innerHTML = `<p class="error">❌ ${result.message || 'No se pudieron obtener las credenciales.'}</p>`;
-                }
-        }
-
-        // Botón "Eliminar" recordatorio
-        const deleteBtn = e.target.closest('.delete-reminder');
-        if (deleteBtn) {
-            if (!confirm('¿Eliminar este recordatorio?')) return;
-            const id = deleteBtn.dataset.id;
-            const result = await window.api.post('api/delete_user_reminder.php', { id });
-            if (result.success) {
-                loadAgenda();
-            } else {
-                alert('Error: ' + result.message);
-            }
-        }
-
-        // Checkbox "Completado"
-        const completeCheck = e.target.closest('.complete-reminder');
-        if (completeCheck) {
-            const id = completeCheck.dataset.id;
-            await window.api.post('api/save_user_reminder.php', {
-                action: 'toggle_complete',
-                id: id
-            });
-        }
-
-        if (decryptBtn) decryptBtn.disabled = false;
     });
 
     // --- 8. LÓGICA DE UI (PESTAÑAS, MODALES, TEMA) ---
@@ -639,8 +748,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const loadedTabs = new Set();
+    let agendaManagerInstance = null;
     function loadTabContent(tabId) {
-        if (loadedTabs.has(tabId)) return; // No recargar si ya se cargó
+        // Para la agenda, siempre recargamos para tener los datos más frescos.
+        if (tabId !== 'agenda-tab' && loadedTabs.has(tabId)) return;
 
         switch (tabId) {
             case 'sites-tab':
@@ -648,63 +759,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 fetchUserSites();
                 break;
             case 'agenda-tab':
-                loadAgenda();
+                if (!agendaManagerInstance) {
+                    agendaManagerInstance = new AgendaManager();
+                }
+                agendaManagerInstance.init();
                 break;
         }
         loadedTabs.add(tabId);
-    }
-
-    // --- 9. NOTIFICACIONES DE AGENDA ---
-    // Sistema de alertas en el navegador para recordatorios vencidos.
-
-    function checkReminders() {
-        const now = new Date();
-
-        agendaItems.forEach(async (item) => {
-            // Comprobar si el recordatorio está vencido, no completado y no notificado previamente.
-            if (!item.id || notifiedReminders.has(String(item.id)) || !item.reminder_datetime || item.is_completed) {
-                return;
-            }
-
-            const reminderTime = new Date(item.reminder_datetime);
-            if (isNaN(reminderTime.getTime()) || reminderTime > now) {
-                return;
-            }
-
-            // Marcar como notificado inmediatamente para evitar llamadas duplicadas.
-            notifiedReminders.add(String(item.id));
-            localStorage.setItem('notifiedReminders', JSON.stringify(Array.from(notifiedReminders)));
-
-            // Obtener los detalles completos para mostrar en la notificación.
-            const result = await window.api.get(`api/get_user_reminder_details.php?id=${item.id}`);
-            if (result.success) {
-                showReminderAlert(result.data);
-            } else {
-                console.error(`Fallo al obtener detalles del recordatorio ${item.id}:`, result.message);
-                // Mostrar una alerta de fallback si falla la obtención de detalles.
-                showReminderAlert({ title: item.title, username: '(No se pudieron cargar los detalles)', notes: '' });
-            }
-        });
-    }
-
-    function showReminderAlert(reminder) {
-        const modal = document.getElementById('reminder-alert-modal');
-        const body = document.getElementById('reminder-alert-body');
-        if (!modal || !body) {
-            // Fallback al alert si el modal no existe
-            let message = `🔔 Recordatorio: ${reminder.title}`;
-            if (reminder.username) message += `\n\nUsuario: ${reminder.username}`;
-            if (reminder.notes) message += `\nNota: ${reminder.notes}`;
-            alert(message);
-            return;
-        }
-
-        let message = `<h3>${window.escapeHTML(reminder.title)}</h3>`;
-        if (reminder.username) message += `<p><strong>Usuario:</strong> ${window.escapeHTML(reminder.username)}</p>`;
-        if (reminder.notes) message += `<p><strong>Nota:</strong> ${window.escapeHTML(reminder.notes)}</p>`;
-        
-        body.innerHTML = message;
-        openModal('reminder-alert-modal');
     }
 
     // --- 10. INICIALIZACIÓN ---
@@ -735,9 +796,6 @@ document.addEventListener('DOMContentLoaded', function() {
         if (initialActiveTab) {
             showTab(initialActiveTab.dataset.tab);
         }
-
-        // Iniciar el verificador de recordatorios
-        setInterval(checkReminders, 60000);
     }
 
     init();

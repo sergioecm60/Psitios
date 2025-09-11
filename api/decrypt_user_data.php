@@ -14,7 +14,7 @@ require_once '../bootstrap.php';
 require_auth();
 
 // Establece la cabecera para indicar que la respuesta será en formato JSON.
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // Verificar que la solicitud se haya hecho usando el método POST.
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {

@@ -15,7 +15,7 @@ require_once '../bootstrap.php';
 require_auth();
 
 // Informa al cliente que la respuesta será en formato JSON.
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {
@@ -34,7 +34,7 @@ try {
             svc.id as service_id, 
             s.id as site_id, 
             s.name,
-            s.password_needs_update, 
+            svc.password_needs_update, 
             s.password_encrypted IS NOT NULL as has_password
         FROM sites s
         JOIN services svc ON s.id = svc.site_id

@@ -9,7 +9,7 @@
 require_once '../bootstrap.php';
 require_once '../config/sso_config.php';
 
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // Solo permitir desde localhost (backend-to-backend)
 $allowed_ips = ['127.0.0.1', '::1', $_SERVER['SERVER_ADDR'] ?? '127.0.0.1'];

@@ -102,7 +102,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     button.disabled = true;
                     button.textContent = 'Reportando...';
 
-                    const result = await window.api.post('api/create_notification.php', { site_id: siteId });
+                    const result = await window.api.post('api/report_problem.php', { site_id: siteId });
 
                     // Proporciona feedback visual al usuario sobre el resultado.
                     if (result.success) {

@@ -17,7 +17,7 @@ require_once '../bootstrap.php';
 // puedan acceder a esta información.
 require_auth('admin');
 // Informa al cliente que la respuesta de este script será en formato JSON.
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // El bloque `try/catch` captura cualquier error inesperado durante la interacción con la base de datos.
 try {

@@ -5,11 +5,12 @@
  */
 
 if (ob_get_level()) {
-    ob_end_clean();}
+    ob_end_clean();
+}
 
 require_once '../bootstrap.php';
 require_auth('admin');
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 $data = json_decode(file_get_contents('php://input'), true);
 if (json_last_error() !== JSON_ERROR_NONE) {

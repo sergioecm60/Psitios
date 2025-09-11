@@ -13,7 +13,7 @@ require_once '../bootstrap.php';
 require_auth();
 
 // Informa al cliente que la respuesta será en formato JSON.
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // --- Validación de la Solicitud ---
 

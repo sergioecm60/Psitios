@@ -22,7 +22,7 @@ require_once __DIR__ . '/../bootstrap.php';
 // y tiene al menos el rol 'admin'. Si no, detiene la ejecución.
 require_auth('admin');
 // Informa al cliente (navegador) que la respuesta de este script será en formato JSON.
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // Función de ayuda para estandarizar las respuestas de error.
 // Centraliza la lógica de enviar un código de estado HTTP y un mensaje JSON, y termina el script.

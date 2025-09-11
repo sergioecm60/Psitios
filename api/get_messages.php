@@ -19,7 +19,7 @@ require_once '../bootstrap.php';
 require_auth();
 
 // Informa al cliente que la respuesta de este script será en formato JSON.
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // Función de ayuda para estandarizar las respuestas de error.
 function send_json_error($code, $message) {

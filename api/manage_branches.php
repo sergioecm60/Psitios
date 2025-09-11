@@ -8,14 +8,15 @@
 
 // Inicia el control del buffer de salida para garantizar una respuesta JSON pura.
 if (ob_get_level()) {
-    ob_end_clean();}
+    ob_end_clean();
+}
 
 // Carga el archivo de arranque y requiere autenticación de administrador.
 require_once __DIR__ . '/../bootstrap.php';
 require_auth('admin');
 
 // Informa al cliente que la respuesta será en formato JSON.
-header('Content-Type: application/json');
+header('Content-Type: application/json; charset=utf-8');
 
 // --- Validación de la Solicitud ---
 

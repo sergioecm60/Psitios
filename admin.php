@@ -29,6 +29,7 @@ $nonce = base64_encode(random_bytes(16));
 
 // --- Headers de Seguridad ---
 // Previene ataques de XSS al restringir de dónde se pueden cargar los scripts.
+header('Content-Type: text/html; charset=utf-8');
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'nonce-{$nonce}'; connect-src 'self';");
 // El error reporting ya está configurado en bootstrap.php, no es necesario repetirlo aquí.
 ?>

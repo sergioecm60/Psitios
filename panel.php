@@ -23,6 +23,7 @@ $nonce = base64_encode(random_bytes(16));
 $csrf_token = generate_csrf_token();
 
 // Content Security Policy (CSP) segura
+header('Content-Type: text/html; charset=utf-8');
 header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self'; connect-src 'self';");
 ?>
 
@@ -89,21 +90,33 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         <div id="agenda-tab" class="tab-content">
             <section class="agenda-section">
                 <h2>📅 Mi Agenda Personal</h2>
-                <button class="btn btn-primary" id="add-reminder-btn">+ Añadir Recordatorio</button>
+                <div class="agenda-controls">
+                    <button class="btn btn-primary" id="add-reminder-btn">+ Añadir Recordatorio</button>
+                    <div class="filter-search-group">
+                        <input type="search" id="agenda-search-input" placeholder="Buscar por título..." autocomplete="off">
+                        <select id="agenda-type-filter">
+                            <option value="">Todos los tipos</option>
+                            <option value="note">Notas</option>
+                            <option value="credential">Credenciales</option>
+                            <option value="phone">Teléfonos</option>
+                        </select>
+                    </div>
+                </div>
                 <div class="table-wrapper">
-                    <table id="agenda-table">
+                    <table id="agenda-table" class="sortable-table">
                         <thead>
                             <tr>
-                                <th></th>
+                                <th class="drag-handle-header" title="Arrastrar para reordenar"></th>
+                                <th title="Fijar">📌</th>
                                 <th title="Tipo">Tipo</th>
                                 <th>Título</th>
                                 <th>Contraseña</th>
+                                <th>Notas / Teléfono</th>
                                 <th>Recordatorio</th>
-                                <th>Teléfono</th>
                                 <th>Acciones</th>
                             </tr>
                         </thead>
-                        <tbody></tbody>
+                        <!-- Los grupos de filas (tbody) se insertarán aquí con JavaScript -->
                     </table>
                 </div>
             </section>
@@ -230,6 +243,7 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" nonce="<?= htmlspecialchars($nonce) ?>"></script>
     <script src="assets/js/main.js" nonce="<?= htmlspecialchars($nonce) ?>" defer></script>
     <script src="assets/js/panel.js" nonce="<?= htmlspecialchars($nonce) ?>" defer></script>
 </body>
