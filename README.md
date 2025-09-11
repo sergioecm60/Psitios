@@ -38,46 +38,41 @@ Un panel de control seguro desarrollado en PHP y MySQL para gestionar el acceso 
 
 ## 🚀 Instalación y Configuración
 
-El proyecto incluye un script de instalación interactivo que automatiza todo el proceso. Para instalar, sigue estos sencillos pasos.
+El proyecto incluye un script de instalación interactivo que automatiza la mayor parte del proceso.
 
-### 1. Clonar el Repositorio
-```bash
-# Navega a tu directorio de proyectos (ej. c:\laragon\www)
-cd c:\laragon\www
+### Requisitos Previos
+*   PHP 8.1 o superior (con las extensiones `pdo_mysql`, `openssl`, `mbstring` habilitadas).
+*   Composer instalado globalmente.
+*   Acceso a un servidor MySQL con un usuario que tenga permisos para crear bases de datos y usuarios (ej. `root`).
 
-# Clona el proyecto
-git clone https://github.com/sergioecm60/Psitios.git
-cd Psitios
-```
+### Pasos de Instalación
+1.  **Clonar el Repositorio**
+    ```bash
+    # Navega a tu directorio de proyectos (ej. c:\laragon\www)
+    cd c:\laragon\www
 
-### 2. Instalar Dependencias
-Asegúrate de tener Composer instalado y ejecuta el siguiente comando en la raíz del proyecto:
-```bash
-composer update
-```
-Esto instalará `phpdotenv` y cualquier otra dependencia definida en `composer.json`.
-
-### 3. Configurar la Base de Datos
-1.  Abre tu gestor de base de datos (como phpMyAdmin o HeidiSQL).
-2.  Crea una nueva base de datos. Se recomienda el nombre `secure_panel_db`.
-3.  Importa el archivo `db_actual/secure_panel_db.sql` en la base de datos que acabas de crear. Esto creará todas las tablas y cargará los datos iniciales.
-
-### 4. Configurar las Variables de Entorno
-1.  En la raíz del proyecto, crea una copia del archivo `.env.example` y renómbrala a `.env`.
-2.  Abre el archivo `.env` y edita las variables con tus datos:
-
-    ```ini
-    # Configuración de tu base de datos local
-    DB_HOST=localhost
-    DB_NAME=secure_panel_db
-    DB_USER=root
-    DB_PASS=tu_contraseña_de_bd
-
-    # ¡IMPORTANTE! Genera una clave de encriptación segura.
-    # Debe ser una cadena aleatoria de 32 bytes.
-    ENCRYPTION_KEY=tu_clave_secreta_de_32_caracteres
+    # Clona el proyecto
+    git clone https://github.com/sergioecm60/Psitios.git
+    cd Psitios
     ```
-    > **Nota de Seguridad:** La `ENCRYPTION_KEY` es crucial para la seguridad de las contraseñas. Asegúrate de que sea una clave fuerte y única para tu instalación.
+
+2.  **Ejecutar el Instalador Interactivo**
+    Abre una terminal en la raíz del proyecto y ejecuta el siguiente comando:
+    ```bash
+    php install.php
+    ```
+    El script te guiará a través de los siguientes pasos:
+    *   Verificará los requisitos del sistema.
+    *   Te pedirá las credenciales de tu usuario `root` de MySQL.
+    *   Creará la base de datos y un usuario específico para la aplicación.
+    *   Generará automáticamente el archivo `.env` con la configuración y una clave de encriptación segura.
+    *   Instalará las dependencias de Composer.
+    *   Importará la estructura de la base de datos desde `db_actual/secure_panel_db.sql`.
+
+3.  **Configurar el Servidor Web**
+    Asegúrate de que tu servidor web (Apache, Nginx, etc.) apunte al directorio raíz del proyecto `Psitios`.
+
+¡Y eso es todo! La aplicación está lista para usarse.
 
 ## Uso
 
