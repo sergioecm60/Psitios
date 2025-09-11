@@ -9,8 +9,8 @@
 # Ignorar los archivos de configuración de entorno locales.
 # Estos contienen secretos y son específicos de cada máquina.
 .env
+config.php
 .env.*
 !.env.example
 
 # Ignorar archivos de diagnóstico y temporales
-
