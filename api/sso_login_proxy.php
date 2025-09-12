@@ -60,7 +60,6 @@ error_log("[SSO PROXY INFO] Token de Psitios validado y consumido. Procediendo a
 $username = $token_data['username'];
 $password = $token_data['password'];
 $redirect_url = $token_data['redirect_url'];
-error_log("sso_login_proxy.php: username=". $username . " redirect_url=" . $redirect_url);
 
 // --- 2. Llamada cURL al endpoint de login de pvytGestiones ---
 $ch = curl_init();
