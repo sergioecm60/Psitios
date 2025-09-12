@@ -35,23 +35,40 @@ function send_json_error(int $code, string $message): void {
  * @param int $userId ID del usuario.
  * @param array $siteIds Array de IDs de sitios a asignar.
  * @return bool True si hubo algún cambio (eliminación o inserción).
+ * @throws Exception Si falla la encriptación de la contraseña.
  */
-function updateUserSiteAssignments(PDO $pdo, int $userId, array $siteIds): bool {
+function updateUserSiteAssignments(PDO $pdo, int $userId, array $newAssignments): bool {
+    // 1. Eliminar todas las asignaciones existentes para este usuario.
     $stmt_delete = $pdo->prepare("DELETE FROM services WHERE user_id = ?");
     $stmt_delete->execute([$userId]);
-    $were_deleted = $stmt_delete->rowCount() > 0;
+    $changesMade = $stmt_delete->rowCount() > 0;
 
-    $were_inserted = false;
-    if (!empty($siteIds)) {
-        $stmt_assign = $pdo->prepare("INSERT INTO services (user_id, site_id) VALUES (?, ?)");
-        foreach ($siteIds as $site_id) {
-            if (filter_var($site_id, FILTER_VALIDATE_INT)) {
-                $stmt_assign->execute([$userId, $site_id]);
-                $were_inserted = $were_inserted || ($stmt_assign->rowCount() > 0);
+    // 2. Insertar las nuevas asignaciones con sus credenciales.
+    if (!empty($newAssignments)) {
+        $stmt_insert = $pdo->prepare(
+            "INSERT INTO services (user_id, site_id, username, password_encrypted) VALUES (?, ?, ?, ?)"
+        );
+
+        foreach ($newAssignments as $assignment) {
+            $siteId = filter_var($assignment['site_id'] ?? null, FILTER_VALIDATE_INT);
+            $username = trim($assignment['username'] ?? '');
+            $password = $assignment['password'] ?? null;
+
+            if (!$siteId) continue; // Omitir si el ID del sitio es inválido.
+
+            $encryptedPassword = null;
+            if (!empty($password)) {
+                $encryptedPassword = encrypt_data($password);
+                if ($encryptedPassword === null) {
+                    throw new Exception("Fallo al encriptar la contraseña para el sitio ID {$siteId}.");
+                }
             }
+            
+            $stmt_insert->execute([$userId, $siteId, $username, $encryptedPassword]);
+            $changesMade = $changesMade || ($stmt_insert->rowCount() > 0);
         }
     }
-    return $were_deleted || $were_inserted;
+    return $changesMade;
 }
 
 // --- Lógica Principal ---
@@ -144,6 +161,28 @@ try {
                     $sites = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                     echo json_encode(['success' => true, 'data' => $sites]);
+                    break;
+
+                case 'get_assigned_services_details':
+                    $user_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+                    if (!$user_id) {
+                        send_json_error(400, 'ID de usuario inválido.');
+                    }
+
+                    if ($current_user_role === 'admin' && $current_user_department_id) {
+                        $stmt_check = $pdo->prepare("SELECT id FROM users WHERE id = ? AND department_id = ?");
+                        $stmt_check->execute([$user_id, $current_user_department_id]);
+                        if (!$stmt_check->fetch()) {
+                            send_json_error(403, 'No tiene permiso para ver los servicios de este usuario.');
+                        }
+                    }
+
+                    // No se devuelve la contraseña encriptada por seguridad.
+                    $stmt = $pdo->prepare("SELECT site_id, username FROM services WHERE user_id = ?");
+                    $stmt->execute([$user_id]);
+                    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+                    echo json_encode(['success' => true, 'data' => $services]);
                     break;
 
                 default:

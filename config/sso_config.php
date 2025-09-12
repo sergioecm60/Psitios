@@ -47,13 +47,21 @@ define('SSO_LOCKOUT_TIME', 300); // 5 minutos
  * URL del endpoint de login del sistema pvytGestiones.
  * Es la dirección a la que el proxy de SSO enviará las credenciales.
  * Es configurable a través de la variable PVYTGESTIONES_LOGIN_URL en el .env.
+ * Si no está definida, se produce un error fatal para evitar fallos silenciosos.
  */
-define('PVYTGESTIONES_LOGIN_URL', $_ENV['PVYTGESTIONES_LOGIN_URL'] ?? 'http://192.168.0.6/pvytGestiones/php/servicios/servicioUsuarios.php');
+if (empty($_ENV['PVYTGESTIONES_LOGIN_URL'])) {
+    trigger_error('CRITICAL: La variable de entorno PVYTGESTIONES_LOGIN_URL no está definida en el archivo .env. El SSO no puede funcionar.', E_USER_ERROR);
+}
+define('PVYTGESTIONES_LOGIN_URL', $_ENV['PVYTGESTIONES_LOGIN_URL']);
 
 /**
  * @const PVYTGESTIONES_BASE_URL
  * URL base del sistema pvytGestiones.
  * Se utiliza para construir las URL de redirección después de un login exitoso.
  * Es configurable a través de la variable PVYTGESTIONES_BASE_URL en el .env.
+ * Si no está definida, se produce un error fatal para evitar fallos silenciosos.
  */
-define('PVYTGESTIONES_BASE_URL', $_ENV['PVYTGESTIONES_BASE_URL'] ?? 'http://192.168.0.6/pvytGestiones');
+if (empty($_ENV['PVYTGESTIONES_BASE_URL'])) {
+    trigger_error('CRITICAL: La variable de entorno PVYTGESTIONES_BASE_URL no está definida en el archivo .env. El SSO no puede funcionar.', E_USER_ERROR);
+}
+define('PVYTGESTIONES_BASE_URL', $_ENV['PVYTGESTIONES_BASE_URL']);
