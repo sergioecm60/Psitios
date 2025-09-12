@@ -1,0 +1,127 @@
+<?php
+/**
+ * /Psitios/api/sso_login_proxy.php
+ *
+ * Proxy de inicio de sesión para el SSO.
+ * Este script actúa como un intermediario seguro.
+ *
+ * Flujo de trabajo:
+ * 1. Recibe un token de un solo uso desde sso_pvyt.php.
+ * 2. Valida el token y recupera las credenciales de la sesión de Psitios.
+ * 3. Realiza una llamada cURL (servidor a servidor) al endpoint de login de 'pvytGestiones'.
+ * 4. Espera una respuesta JSON de 'pvytGestiones' que contenga un token de acceso.
+ * 5. Redirige el navegador del usuario a la URL base de 'pvytGestiones', pasando
+ *    el token de acceso como un parámetro en la URL.
+ * 6. Se asume que el frontend (SPA) de 'pvytGestiones' está preparado para
+ *    recibir este token y completar el inicio de sesión.
+ */
+require_once '../bootstrap.php';
+require_once '../config/sso_config.php';
+require_auth();
+
+/**
+ * Muestra un mensaje de error estandarizado y termina la ejecución.
+ * @param int $http_code Código de estado HTTP.
+ * @param string $title Título del error para el usuario.
+ * @param string $message Mensaje para el usuario.
+ * @param ?string $log_message Mensaje detallado para el log de errores del servidor.
+ */
+function sso_proxy_die(int $http_code, string $title, string $message, ?string $log_message = null): void {
+    if ($log_message) {
+        error_log("SSO Proxy Error: " . $log_message);
+    }
+    http_response_code($http_code);
+    // Genera una página de error amigable en lugar de un JSON.
+    $error_html = <<<HTML
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Error de SSO</title><style>body{font-family:sans-serif;background:#f9f9f9;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}.container{text-align:center;padding:2em;background:white;border:1px solid #ddd;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,0.05);}h2{color:#d9534f;}</style></head><body><div class="container"><h2>❌ {$title}</h2><p>{$message}</p><p><a href="javascript:history.back()">Volver a intentarlo</a></p></div></body></html>
+HTML;
+    die($error_html);
+}
+
+// --- 1. Validación del token interno de Psitios ---
+$sso_token = $_POST['sso_token'] ?? '';
+if (empty($sso_token) || !isset($_SESSION['sso_tokens'][$sso_token])) {
+    sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO es inválido o ha expirado.', "Invalid or missing sso_token.");
+}
+
+$token_data = $_SESSION['sso_tokens'][$sso_token];
+
+// Validar expiración del token
+if ($token_data['expires'] < time()) {
+    unset($_SESSION['sso_tokens'][$sso_token]); // Limpiar token expirado
+    sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO ha expirado. Por favor, intenta de nuevo.', "Expired sso_token.");
+}
+
+// El token es de un solo uso. Invalidarlo inmediatamente para prevenir ataques de repetición.
+unset($_SESSION['sso_tokens'][$sso_token]);
+
+$username = $token_data['username'];
+$password = $token_data['password'];
+$redirect_url = $token_data['redirect_url'];
+
+// --- 2. Llamada cURL al endpoint de login de pvytGestiones ---
+$ch = curl_init();
+
+$post_data = [
+    'peticion' => 6,
+    'usuario' => [
+        'nombreUsuario' => $username,
+        'password' => $password
+    ]
+];
+
+curl_setopt($ch, CURLOPT_URL, PVYTGESTIONES_LOGIN_URL);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post_data));
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Timeout de conexión
+curl_setopt($ch, CURLOPT_TIMEOUT, 30);      // Timeout total de la operación
+
+// ADVERTENCIA DE SEGURIDAD: Deshabilitar la verificación SSL solo es aceptable
+// para entornos de desarrollo locales con URLs HTTP o certificados autofirmados.
+// NUNCA hagas esto en producción con un endpoint HTTPS público.
+if (parse_url(PVYTGESTIONES_LOGIN_URL, PHP_URL_SCHEME) === 'https' && strpos(parse_url(PVYTGESTIONES_LOGIN_URL, PHP_URL_HOST), 'localhost') === false) {
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+} else {
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+}
+
+$response_body = curl_exec($ch);
+$http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curl_error = curl_error($ch);
+curl_close($ch);
+
+// --- 3. Procesamiento de la respuesta de pvytGestiones ---
+
+if ($curl_error) {
+    sso_proxy_die(502, 'Error de Comunicación', 'No se pudo conectar con el sistema de destino.', "cURL error: {$curl_error}");
+}
+
+if ($http_code !== 200) {
+    sso_proxy_die(502, 'Error de Autenticación Externa', "El sistema de destino devolvió un error (Código: {$http_code}).", "pvytGestiones returned HTTP {$http_code}. Response: {$response_body}");
+}
+
+$response_data = json_decode($response_body, true);
+
+// Verificar si la respuesta es un JSON válido y contiene el token esperado.
+if (json_last_error() !== JSON_ERROR_NONE || !isset($response_data['token']) || empty($response_data['token'])) {
+    sso_proxy_die(500, 'Respuesta Inválida', 'El sistema de destino no devolvió un token de acceso válido. Podrían ser credenciales incorrectas.', "Invalid JSON or missing token from pvytGestiones. Response: " . print_r($response_data, true));
+}
+
+$pvyt_token = $response_data['token'];
+
+// --- 4. Redirección final al navegador del usuario ---
+
+// Construir la URL de redirección final, añadiendo el token como parámetro.
+// Se asume que el frontend de pvytGestiones sabe cómo manejar este parámetro.
+// Ejemplo: http://.../pvytGestiones/#/?sso_token=EL_TOKEN_RECIBIDO
+$final_url = rtrim($redirect_url, '/'); // Asegurar que no haya doble barra
+// Determinar si ya hay un query string para añadir el token correctamente.
+$separator = strpos($final_url, '?') === false ? '?' : '&';
+$final_url .= $separator . 'sso_token=' . urlencode($pvyt_token);
+
+// Redirigir al usuario. El navegador recibirá esta cabecera y cargará la nueva URL.
+header('Location: ' . $final_url, true, 302);
+exit;
+
