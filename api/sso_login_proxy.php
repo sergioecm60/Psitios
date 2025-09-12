@@ -106,7 +106,7 @@ $response_data = json_decode($response_body, true);
 
 // Verificar si la respuesta es un JSON válido y contiene el token esperado.
 if (json_last_error() !== JSON_ERROR_NONE || !isset($response_data['token']) || empty($response_data['token'])) {
-    sso_proxy_die(500, 'Respuesta Inválida', 'El sistema de destino no devolvió un token de acceso válido. Podrían ser credenciales incorrectas.', "Invalid JSON or missing token from pvytGestiones. Response: " . print_r($response_data, true));
+    sso_proxy_die(500, 'Respuesta Inválida', 'El sistema de destino no devolvió un token de acceso válido. Podrían ser credenciales incorrectas.', "Invalid JSON or missing token from pvytGestiones. Raw Response: " . $response_body);
 }
 
 $pvyt_token = $response_data['token'];
@@ -114,14 +114,32 @@ $pvyt_token = $response_data['token'];
 // --- 4. Redirección final al navegador del usuario ---
 
 // Construir la URL de redirección final, añadiendo el token como parámetro.
-// Se asume que el frontend de pvytGestiones sabe cómo manejar este parámetro.
-// Ejemplo: http://.../pvytGestiones/#/?sso_token=EL_TOKEN_RECIBIDO
-$final_url = rtrim($redirect_url, '/'); // Asegurar que no haya doble barra
-// Determinar si ya hay un query string para añadir el token correctamente.
-$separator = strpos($final_url, '?') === false ? '?' : '&';
-$final_url .= $separator . 'sso_token=' . urlencode($pvyt_token);
+// Se utiliza parse_url para manejar correctamente los fragmentos (#) de la URL,
+// asegurando que los parámetros de la query string se añadan antes del fragmento.
+$url_parts = parse_url($redirect_url);
+$query_params = [];
+if (isset($url_parts['query'])) {
+    parse_str($url_parts['query'], $query_params);
+}
+$query_params['sso_token'] = $pvyt_token;
+
+// Reconstruir la URL base (scheme, host, path)
+$final_url = ($url_parts['scheme'] ?? 'http') . '://' . ($url_parts['host'] ?? '');
+if (isset($url_parts['port'])) {
+    $final_url .= ':' . $url_parts['port'];
+}
+if (isset($url_parts['path'])) {
+    $final_url .= $url_parts['path'];
+}
+
+// Añadir el nuevo query string
+$final_url .= '?' . http_build_query($query_params);
+
+// Añadir el fragmento si existía
+if (isset($url_parts['fragment'])) {
+    $final_url .= '#' . $url_parts['fragment'];
+}
 
 // Redirigir al usuario. El navegador recibirá esta cabecera y cargará la nueva URL.
 header('Location: ' . $final_url, true, 302);
 exit;
-
