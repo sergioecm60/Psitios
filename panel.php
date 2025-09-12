@@ -245,6 +245,6 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
 
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" nonce="<?= htmlspecialchars($nonce) ?>"></script>
     <script src="assets/js/main.js" nonce="<?= htmlspecialchars($nonce) ?>" defer></script>
-    <script src="assets/js/panel.js" nonce="<?= htmlspecialchars($nonce) ?>" defer></script>
+    <script src="assets/js/panel.js?v=1.1" nonce="<?= htmlspecialchars($nonce) ?>" defer></script>
 </body>
 </html>

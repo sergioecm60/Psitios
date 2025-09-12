@@ -188,7 +188,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Aquí predefinimos los nombres de los sitios que usarán SSO.
         // La comparación es insensible a mayúsculas/minúsculas.
         const ssoEnabledSites = ['pvytgestiones', 'vendedores', 'compras', 'hoteles'];
-        const isSsoSite = isAssigned && ssoEnabledSites.includes(item.name.toLowerCase());
+        // Se eliminan los espacios del nombre para una comparación robusta.
+        const isSsoSite = isAssigned && ssoEnabledSites.includes(item.name.toLowerCase().replace(/\s+/g, ''));
 
         const id = isAssigned ? item.service_id : item.id;
         const siteId = isAssigned ? item.site_id : item.id;
