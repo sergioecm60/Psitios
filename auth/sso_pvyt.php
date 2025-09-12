@@ -56,20 +56,24 @@ if ($_SESSION['sso_attempts'] >= SSO_MAX_ATTEMPTS && isset($_SESSION['sso_lockou
 }
 
 // --- 2. Validación de Entrada ---
-$site_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if (!$site_id) {
-    sso_die(400, 'Solicitud Incorrecta', 'El ID del sitio es requerido para iniciar el SSO.');
+// El ID que se recibe es el ID del servicio (la asignación), no del sitio directamente.
+$service_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if (!$service_id) {
+    sso_die(400, 'Solicitud Incorrecta', 'El ID del servicio es requerido para iniciar el SSO.');
 }
 
-error_log("[SSO INICIO] sso_pvyt.php: Solicitud para site_id: {$site_id} por user_id: {$_SESSION['user_id']}");
+error_log("[SSO INICIO] sso_pvyt.php: Solicitud para service_id: {$service_id} por user_id: {$_SESSION['user_id']}");
 
 $pdo = get_pdo_connection();
+// Esta consulta ahora busca en los sitios asignados (sites y services), no en los personales (user_sites).
+// Es la clave para que el SSO funcione con los sitios compartidos.
 $stmt = $pdo->prepare("
-    SELECT us.name, us.username, us.password_encrypted 
-    FROM user_sites us 
-    WHERE us.id = ? AND us.user_id = ?
+    SELECT s.name, s.username, s.password_encrypted
+    FROM sites s
+    JOIN services svc ON s.id = svc.site_id
+    WHERE svc.id = ? AND svc.user_id = ?
 ");
-$stmt->execute([$site_id, $_SESSION['user_id']]);
+$stmt->execute([$service_id, $_SESSION['user_id']]);
 $site = $stmt->fetch();
 
 if (!$site) {

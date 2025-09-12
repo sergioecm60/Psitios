@@ -184,31 +184,47 @@ document.addEventListener('DOMContentLoaded', function() {
      * @returns {string} - El HTML de la tarjeta.
      */
     function createServiceCard(item, isAssigned, isPersonal = false) {
+        // --- Lógica de SSO ---
+        // Aquí predefinimos los nombres de los sitios que usarán SSO.
+        // La comparación es insensible a mayúsculas/minúsculas.
+        const ssoEnabledSites = ['pvytgestiones', 'vendedores', 'compras', 'hoteles'];
+        const isSsoSite = isAssigned && ssoEnabledSites.includes(item.name.toLowerCase());
+
         const id = isAssigned ? item.service_id : item.id;
         const siteId = isAssigned ? item.site_id : item.id;
         const hasPassword = item.has_password || item.password_encrypted;
 
-        // Si el sitio personal tiene una URL, convierte el título en un enlace.
+        // Para sitios personales con URL, el título es un enlace.
         const nameHtml = (isPersonal && item.url)
             ? `<a href="${item.url.startsWith('http') ? item.url : 'http://' + item.url}" target="_blank" rel="noopener noreferrer" title="Ir a ${window.escapeHTML(item.name)}">${window.escapeHTML(item.name)}</a>`
             : window.escapeHTML(item.name);
 
-        // Lógica para el botón de SSO: si el sitio se llama 'pvytgestiones', muestra un botón de acceso directo.
-        const isPbytSite = isPersonal && item.name.toLowerCase() === 'pvytgestiones';
-        const ssoButton = `<a href="auth/sso_pvyt.php?id=${id}" class="btn-sso">🔐 Acceder (SSO)</a>`;
-        const viewButton = hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="${isAssigned ? 'assigned' : 'personal'}">👁️ Ver</button>` : '';
+        // --- Lógica de Botones ---
+        let buttonsHtml = '';
+        if (isSsoSite) {
+            // 1. Si es un sitio asignado con SSO, solo mostrar el botón "Ingresar".
+            buttonsHtml = `<a href="auth/sso_pvyt.php?id=${id}" class="btn btn-primary btn-sso">Ingresar</a>`;
+        } else if (isAssigned) {
+            // 2. Si es un sitio asignado normal, mostrar los botones de siempre.
+            buttonsHtml = `
+                ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="assigned">👁️ Ver</button>` : ''}
+                <button class="btn-notify-expired" data-id="${id}" ${item.password_needs_update ? 'disabled' : ''}>⏳ Notificar</button>
+                <button class="btn-report-problem" data-site-id="${siteId}">🚨 Reportar</button>
+            `;
+        } else if (isPersonal) {
+            // 3. Si es un sitio personal, mostrar sus botones correspondientes.
+            buttonsHtml = `
+                ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="personal">️ Ver</button>` : ''}
+                <button class="btn btn-sm btn-secondary btn-edit-site" data-id="${id}" data-type="personal">✏️ Editar</button>
+                <button class="btn btn-sm btn-danger btn-delete-site" data-id="${id}" data-type="personal">🗑️ Eliminar</button>
+            `;
+        }
 
         return `
             <div class="service-card">
                 <h3>${nameHtml}</h3>
                 ${isAssigned && item.password_needs_update ? '<p class="notification">⚠️ Contraseña pendiente</p>' : ''}
-                <div class="credentials-area">
-                    ${isPbytSite ? ssoButton : viewButton}
-                    ${isAssigned ? `<button class="btn-notify-expired" data-id="${id}" ${item.password_needs_update ? 'disabled' : ''}>⏳ Notificar</button>` : ''}
-                    ${isAssigned ? `<button class="btn-report-problem" data-site-id="${siteId}">🚨 Reportar</button>` : ''}
-                    ${isPersonal ? `<button class="btn btn-sm btn-secondary btn-edit-site" data-id="${id}" data-type="personal">✏️ Editar</button>` : ''}
-                    ${isPersonal ? `<button class="btn btn-sm btn-danger btn-delete-site" data-id="${id}" data-type="personal">🗑️ Eliminar</button>` : ''}
-                </div>
+                <div class="credentials-area">${buttonsHtml}</div>
                 <div class="creds-display hidden" id="creds-${isAssigned ? 'a' : 'p'}-${id}"></div>
             </div>
         `;
