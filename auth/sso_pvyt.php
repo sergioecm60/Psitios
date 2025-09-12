@@ -118,8 +118,17 @@ foreach ($_SESSION['sso_tokens'] as $key => $data) {
     }
 }
 
-$redirect_url = rtrim(PVYTGESTIONES_BASE_URL, '/') . '/#/';
-error_log("[SSO INFO] sso_pvyt.php: Generando token. URL de redirección final será construida desde: {$redirect_url}");
+// Construir la URL de redirección dinámicamente para ser robusto ante configuraciones de .env.
+// Esto asegura que la redirección siempre use el host por el que el usuario accedió.
+$scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$host = $_SERVER['HTTP_HOST']; // ej: pedrazaviajes.dyndns.org:55063
+// Asumimos que pvytGestiones está en el mismo nivel que Psitios.
+// BASE_URL es '/Psitios/'. rtrim lo convierte en '/Psitios'. dirname lo convierte en '/'.
+$base_path = dirname(rtrim(BASE_URL, '/'));
+$pvytgestiones_path = rtrim($base_path, '/') . '/pvytGestiones';
+$dynamic_redirect_base = "{$scheme}://{$host}{$pvytgestiones_path}";
+$redirect_url = rtrim($dynamic_redirect_base, '/') . '/#/';
+error_log("[SSO INFO] sso_pvyt.php: URL de redirección dinámica construida: {$redirect_url}");
 
 // ADVERTENCIA DE SEGURIDAD: Se almacena la contraseña en texto plano en la sesión.
 // Aunque es por un tiempo muy corto (SSO_TOKEN_LIFETIME), sigue siendo un riesgo.
@@ -129,7 +138,7 @@ $_SESSION['sso_tokens'][$token] = [
     'password' => $password,
     'expires' => $expires,
     'site_name' => $site['name'],
-    'redirect_url' => $redirect_url // URL final a la que el proxy redirigirá.
+    'redirect_url' => $redirect_url // Usar la URL dinámica.
 ];
 
 ?>
