@@ -212,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (isPersonal) {
             // 3. Si es un sitio personal, mostrar sus botones correspondientes.
             buttonsHtml = `
-                ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="personal">️ Ver</button>` : ''}
+                ${hasPassword ? `<button class="btn-view-creds" data-id="${id}" data-type="personal">👁️ Ver</button>` : ''}
                 <button class="btn btn-sm btn-secondary btn-edit-site" data-id="${id}" data-type="personal">✏️ Editar</button>
                 <button class="btn btn-sm btn-danger btn-delete-site" data-id="${id}" data-type="personal">🗑️ Eliminar</button>
             `;
