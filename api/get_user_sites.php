@@ -35,6 +35,7 @@ try {
             s.id as site_id, 
             s.name,
             svc.password_needs_update, 
+            s.is_sso,
             s.password_encrypted IS NOT NULL as has_password
         FROM sites s
         JOIN services svc ON s.id = svc.site_id
@@ -51,6 +52,7 @@ try {
         $site['service_id'] = (int)$site['service_id'];
         $site['site_id'] = (int)$site['site_id'];
         $site['password_needs_update'] = (bool)$site['password_needs_update'];
+        $site['is_sso'] = (bool)$site['is_sso'];
         $site['has_password'] = (bool)$site['has_password'];
     }
 

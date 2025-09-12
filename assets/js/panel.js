@@ -185,11 +185,8 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function createServiceCard(item, isAssigned, isPersonal = false) {
         // --- Lógica de SSO ---
-        // Aquí predefinimos los nombres de los sitios que usarán SSO.
-        // La comparación es insensible a mayúsculas/minúsculas.
-        const ssoEnabledSites = ['pvytgestiones', 'vendedores', 'compras', 'hoteles'];
-        // Se eliminan los espacios del nombre para una comparación robusta.
-        const isSsoSite = isAssigned && ssoEnabledSites.includes(item.name.toLowerCase().replace(/\s+/g, ''));
+        // Se determina si es un sitio SSO a través del flag que viene de la base de datos.
+        const isSsoSite = isAssigned && item.is_sso;
 
         const id = isAssigned ? item.service_id : item.id;
         const siteId = isAssigned ? item.site_id : item.id;

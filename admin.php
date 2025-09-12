@@ -45,6 +45,24 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     <link rel="stylesheet" href="assets/css/notifications_panel.css">
     <style nonce="<?= $nonce ?>">
         .hidden { display: none !important; }
+        .site-assignment-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+            background-color: var(--background-color-light);
+            border: 1px solid var(--border-color);
+        }
+        .site-assignment-row label {
+            flex-grow: 1;
+            font-weight: 500;
+        }
+        .site-assignment-row input[type="text"],
+        .site-assignment-row input[type="password"] {
+            width: 180px;
+        }
     </style>
 </head>
 <body 
@@ -430,6 +448,10 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                         <button type="button" class="toggle-password">Mostrar</button>
                     </div>
                     <small>Deje en blanco para mantener la contraseña actual.</small>
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="site-is-sso" name="is_sso" value="1"> Es un sitio SSO (Single Sign-On)</label>
+                    <small>Si se marca, se usará el flujo de inicio de sesión automático y solo se mostrará el botón "Ingresar".</small>
                 </div>
                 <div class="form-group hidden" id="site-visibility-group">
                     <label for="site-visibility">Visibilidad</label>

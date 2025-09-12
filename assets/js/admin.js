@@ -837,6 +837,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('site-url').value = site.url;
                 document.getElementById('site-username').value = site.username;
                 document.getElementById('site-notes').value = site.notes;
+                document.getElementById('site-is-sso').checked = site.is_sso;
                 const visibilityGroup = document.getElementById('site-visibility-group');
                 visibilityGroup.classList.toggle('hidden', CURRENT_USER_ROLE !== 'superadmin');
                 openModal('site-modal');
@@ -860,6 +861,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const formData = new FormData(siteForm);
         const data = Object.fromEntries(formData.entries());
         data.id = parseInt(data.id) || null;
+        // Asegurarse de que el valor booleano se envíe correctamente
+        data.is_sso = document.getElementById('site-is-sso').checked;
         const result = await window.api.post('api/manage_sites.php', data);
         if (result && result.success) {
             closeModal('site-modal');

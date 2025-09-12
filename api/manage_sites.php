@@ -40,7 +40,7 @@ try {
             $action = $_GET['action'] ?? null;
             switch ($action) {
                 case 'list':
-                    $sql = "SELECT s.id, s.name, s.url, s.username, s.password_needs_update, s.notes, d.name as department_name 
+                    $sql = "SELECT s.id, s.name, s.url, s.username, s.password_needs_update, s.notes, s.is_sso, d.name as department_name 
                             FROM sites s
                             LEFT JOIN departments d ON s.department_id = d.id";
                     $params = [];
@@ -58,6 +58,7 @@ try {
                     foreach ($sites as &$site) {
                         $site['id'] = (int)$site['id'];
                         $site['password_needs_update'] = (bool)$site['password_needs_update'];
+                        $site['is_sso'] = (bool)$site['is_sso'];
                     }
 
                     echo json_encode(['success' => true, 'data' => $sites]);
@@ -67,7 +68,7 @@ try {
                     $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
                     if (!$id) send_json_error(400, 'ID de sitio inválido.');
 
-                    $sql = "SELECT id, name, url, username, notes, department_id, password_encrypted IS NOT NULL as has_password FROM sites WHERE id = ?";
+                    $sql = "SELECT id, name, url, username, notes, department_id, is_sso, password_encrypted IS NOT NULL as has_password FROM sites WHERE id = ?";
                     $params = [$id];
 
                     if ($user_role === 'admin' && $current_user_department_id) {
@@ -84,6 +85,7 @@ try {
                     $site['id'] = (int)$site['id'];
                     $site['department_id'] = $site['department_id'] ? (int)$site['department_id'] : null;
                     $site['has_password'] = (bool)$site['has_password'];
+                    $site['is_sso'] = (bool)$site['is_sso'];
 
                     echo json_encode(['success' => true, 'data' => $site]);
                     break;
@@ -111,6 +113,7 @@ try {
                     $username = trim($input['username'] ?? '');
                     $password = $input['password'] ?? null;
                     $notes = trim($input['notes'] ?? '');
+                    $is_sso = filter_var($input['is_sso'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
                     if (empty($name) || empty($url)) send_json_error(400, 'Nombre y URL son requeridos.');
                     if (!filter_var('http://' . preg_replace('#^https?://#', '', $url), FILTER_VALIDATE_URL)) send_json_error(400, 'URL no válida.');
@@ -140,8 +143,8 @@ try {
                     }
 
                     if ($action === 'add') {
-                        $sql = "INSERT INTO sites (name, url, username, notes, created_by, department_id, password_needs_update" . ($encrypted_password ? ", password_encrypted" : "") . ") VALUES (?, ?, ?, ?, ?, ?, 0" . ($encrypted_password ? ", ?" : "") . ")";
-                        $params = [$name, $url, $username, $notes, $current_user_id, $department_id];
+                        $sql = "INSERT INTO sites (name, url, username, notes, created_by, department_id, is_sso, password_needs_update" . ($encrypted_password ? ", password_encrypted" : "") . ") VALUES (?, ?, ?, ?, ?, ?, ?, 0" . ($encrypted_password ? ", ?" : "") . ")";
+                        $params = [$name, $url, $username, $notes, $current_user_id, $department_id, $is_sso];
                         if ($encrypted_password) {
                             $params[] = $encrypted_password;
                         }
@@ -150,8 +153,8 @@ try {
                         echo json_encode(['success' => true, 'message' => 'Sitio creado.', 'id' => (int)$pdo->lastInsertId()]);
                     } else { // edit
                         if (!$id) send_json_error(400, 'ID de sitio no proporcionado para editar.');
-                        $sql_parts = ["name = ?", "url = ?", "username = ?", "notes = ?", "password_needs_update = 0"];
-                        $params = [$name, $url, $username, $notes];
+                        $sql_parts = ["name = ?", "url = ?", "username = ?", "notes = ?", "is_sso = ?", "password_needs_update = 0"];
+                        $params = [$name, $url, $username, $notes, $is_sso];
                         if ($user_role === 'superadmin') {
                             $sql_parts[] = "department_id = ?";
                             $params[] = $department_id;
