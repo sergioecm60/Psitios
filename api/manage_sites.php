@@ -195,27 +195,36 @@ try {
                     $site = $stmt_get_name->fetch();
                     $site_name_for_log = $site ? $site['name'] : "ID {$id}";
 
-                    // ✅ Validación de dependencias: no permitir eliminar si está asignado.
-                    $stmt = $pdo->prepare("SELECT COUNT(*) FROM services WHERE site_id = ?");
-                    $stmt->execute([$id]);
-                    if ($stmt->fetchColumn() > 0) {
-                        send_json_error(400, 'No se puede eliminar el sitio porque está asignado a uno o más usuarios.');
-                    }
+                    // Iniciar una transacción para asegurar que ambas eliminaciones (asignaciones y sitio)
+                    // se completen correctamente o ninguna lo haga.
+                    $pdo->beginTransaction();
 
-                    $sql = "DELETE FROM sites WHERE id = ?";
-                    $params = [$id];
-                    if ($user_role === 'admin' && $current_user_department_id) {
-                        $sql .= " AND department_id = ?";
-                        $params[] = $current_user_department_id;
-                    }
-                    $stmt = $pdo->prepare($sql);
-                    $stmt->execute($params);
+                    try {
+                        // 1. Eliminar todas las asignaciones de este sitio a los usuarios (cascading delete).
+                        $stmt_unassign = $pdo->prepare("DELETE FROM services WHERE site_id = ?");
+                        $stmt_unassign->execute([$id]);
 
-                    if ($stmt->rowCount() > 0) {
-                        log_action($pdo, $current_user_id, null, "site_deleted: {$site_name_for_log}", $_SERVER['REMOTE_ADDR']);
-                        echo json_encode(['success' => true, 'message' => 'Sitio eliminado.']);
-                    } else {
-                        send_json_error(404, 'Sitio no encontrado o sin permisos.');
+                        // 2. Eliminar el sitio principal.
+                        $sql = "DELETE FROM sites WHERE id = ?";
+                        $params = [$id];
+                        if ($user_role === 'admin' && $current_user_department_id) {
+                            $sql .= " AND department_id = ?";
+                            $params[] = $current_user_department_id;
+                        }
+                        $stmt = $pdo->prepare($sql);
+                        $stmt->execute($params);
+
+                        if ($stmt->rowCount() > 0) {
+                            $pdo->commit(); // Confirmar los cambios
+                            log_action($pdo, $current_user_id, null, "site_deleted: {$site_name_for_log}", $_SERVER['REMOTE_ADDR']);
+                            echo json_encode(['success' => true, 'message' => 'Sitio y todas sus asignaciones eliminados.']);
+                        } else {
+                            $pdo->rollBack(); // Revertir si no se encontró el sitio
+                            send_json_error(404, 'Sitio no encontrado o sin permisos.');
+                        }
+                    } catch (Exception $e) {
+                        $pdo->rollBack(); // Revertir en caso de cualquier error durante la transacción
+                        throw $e; // Re-lanzar la excepción para que el manejador principal la capture
                     }
                     break;
 
