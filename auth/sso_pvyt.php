@@ -68,7 +68,7 @@ $pdo = get_pdo_connection();
 // Esta consulta ahora busca en los sitios asignados (sites y services), no en los personales (user_sites).
 // Es la clave para que el SSO funcione con los sitios compartidos.
 $stmt = $pdo->prepare("
-    SELECT s.name, s.username, s.password_encrypted
+    SELECT s.id as site_id, s.name, s.username, s.password_encrypted
     FROM sites s
     JOIN services svc ON s.id = svc.site_id
     WHERE svc.id = ? AND svc.user_id = ?
@@ -77,7 +77,7 @@ $stmt->execute([$service_id, $_SESSION['user_id']]);
 $site = $stmt->fetch();
 
 if (!$site) {
-    error_log("[SSO ERROR] sso_pvyt.php: Sitio no encontrado o sin permisos. site_id: {$site_id}, user_id: {$_SESSION['user_id']}");
+    error_log("[SSO ERROR] sso_pvyt.php: Sitio no encontrado o sin permisos para el service_id: {$service_id}, user_id: {$_SESSION['user_id']}");
     sso_die(404, 'Acceso Denegado', 'Sitio no encontrado o no tienes permisos para acceder a él.');
 }
 
@@ -88,7 +88,7 @@ if (!$password) {
     if ($_SESSION['sso_attempts'] >= SSO_MAX_ATTEMPTS) {
         $_SESSION['sso_lockout_until'] = time() + SSO_LOCKOUT_TIME;
     }
-    error_log("[SSO ERROR] sso_pvyt.php: Fallo al descifrar contraseña para site_id: {$site_id}.");
+    error_log("[SSO ERROR] sso_pvyt.php: Fallo al descifrar contraseña para site_id: {$site['site_id']}.");
     sso_die(500, 'Error de Configuración', 'No se pudieron descifrar las credenciales. Contacta al administrador.');
 }
 
