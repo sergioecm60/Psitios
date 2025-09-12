@@ -13,7 +13,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     $dotenv->load();
 }
 
-define('SSO_SECRET_KEY', $_ENV['SSO_SECRET_KEY'] ?? 'clave_por_defecto_insegura');
+define('SSO_SECRET_KEY', $_ENV['SSO_SECRET_KEY'] ?? '744bdc680035022bf3da0f892a2a794e63428d5474c0960384bcf45dd82df8db');
 define('SSO_TOKEN_LIFETIME', 120); // 2 minutos
 define('SSO_MAX_ATTEMPTS', 5);
 define('SSO_LOCKOUT_TIME', 300); // 5 minutos
