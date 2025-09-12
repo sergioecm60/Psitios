@@ -43,6 +43,7 @@ $sso_token = $_POST['sso_token'] ?? '';
 if (empty($sso_token) || !isset($_SESSION['sso_tokens'][$sso_token])) {
     sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO es inválido o ha expirado.', "Invalid or missing sso_token.");
 }
+    error_log("sso_login_proxy.php: sso_token valid: " . $sso_token);
 
 $token_data = $_SESSION['sso_tokens'][$sso_token];
 
@@ -50,6 +51,7 @@ $token_data = $_SESSION['sso_tokens'][$sso_token];
 if ($token_data['expires'] < time()) {
     unset($_SESSION['sso_tokens'][$sso_token]); // Limpiar token expirado
     sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO ha expirado. Por favor, intenta de nuevo.', "Expired sso_token.");
+    error_log("sso_login_proxy.php: sso_token expired: " . $sso_token);
 }
 
 // El token es de un solo uso. Invalidarlo inmediatamente para prevenir ataques de repetición.
@@ -58,6 +60,7 @@ unset($_SESSION['sso_tokens'][$sso_token]);
 $username = $token_data['username'];
 $password = $token_data['password'];
 $redirect_url = $token_data['redirect_url'];
+error_log("sso_login_proxy.php: username=". $username . " redirect_url=" . $redirect_url);
 
 // --- 2. Llamada cURL al endpoint de login de pvytGestiones ---
 $ch = curl_init();
@@ -104,6 +107,7 @@ if ($http_code !== 200) {
 
 $response_data = json_decode($response_body, true);
 
+error_log("sso_login_proxy.php: pvytGestiones response: " . print_r($response_data, true));
 // Verificar si la respuesta es un JSON válido y contiene el token esperado.
 if (json_last_error() !== JSON_ERROR_NONE || !isset($response_data['token']) || empty($response_data['token'])) {
     sso_proxy_die(500, 'Respuesta Inválida', 'El sistema de destino no devolvió un token de acceso válido. Podrían ser credenciales incorrectas.', "Invalid JSON or missing token from pvytGestiones. Raw Response: " . $response_body);
