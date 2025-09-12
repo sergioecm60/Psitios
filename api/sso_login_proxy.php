@@ -72,12 +72,17 @@ $post_data = [
         'password' => $password
     ]
 ];
+$json_post_data = json_encode($post_data);
 error_log("[SSO PROXY INFO] Datos cURL (sin contraseña): " . json_encode(['peticion' => 6, 'usuario' => ['nombreUsuario' => $username]]));
 
 curl_setopt($ch, CURLOPT_URL, PVYTGESTIONES_LOGIN_URL);
 curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($post_data));
+curl_setopt($ch, CURLOPT_POSTFIELDS, $json_post_data);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Content-Length: ' . strlen($json_post_data)
+]);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10); // Timeout de conexión
 curl_setopt($ch, CURLOPT_TIMEOUT, 30);      // Timeout total de la operación
