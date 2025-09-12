@@ -231,8 +231,14 @@ document.addEventListener('DOMContentLoaded', function() {
             branch_id: document.getElementById('branch_id').value || null,
             department_id: document.getElementById('department_id').value || null,
             assigned_admin_id: document.getElementById('assigned_admin_id').value || null,
-            assigned_sites: Array.from(document.querySelectorAll('.site-checkbox:checked'))
-                .map(cb => cb.value)
+            // Modificado para enviar un objeto con credenciales por sitio
+            assigned_sites: Array.from(document.querySelectorAll('.site-assignment-row'))
+                .filter(row => row.querySelector('.site-checkbox').checked)
+                .map(row => ({
+                    site_id: row.dataset.siteId,
+                    username: row.querySelector('.site-username-input').value,
+                    password: row.querySelector('.site-password-input').value
+                }))
         };
 
         if (data.id) data.id = parseInt(data.id);
@@ -381,19 +387,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // Safer handling of assigned sites to prevent errors if apiCall returns null
             let assignedSiteIds = [];
             if (userId) {
-                const assignedResult = await window.api.get(`api/manage_users.php?action=get_assigned_sites&id=${userId}`);
+                // Ahora obtenemos los detalles completos, incluyendo credenciales
+                const assignedResult = await window.api.get(`api/manage_users.php?action=get_assigned_services_details&id=${userId}`);
                 if (assignedResult && assignedResult.success) {
-                    assignedSiteIds = assignedResult.data.map(s => s.id);
+                    assignedSiteIds = assignedResult.data; // Es un array de objetos
                 }
             }
 
             if (result.success) {
                 let html = '';
                 result.data.forEach(site => {
-                    const checked = assignedSiteIds.includes(site.id) ? 'checked' : '';
-                    html += `<div class="form-check">
-                        <input type="checkbox" class="site-checkbox" id="site-${site.id}" value="${site.id}" ${checked}>
+                    const assignment = assignedSiteIds.find(s => s.site_id == site.id);
+                    const checked = assignment ? 'checked' : '';
+                    const siteUsername = assignment ? (assignment.username || '') : '';
+                    // La contraseña no se envía de vuelta por seguridad, el campo siempre estará vacío para editar.
+                    html += `<div class="site-assignment-row" data-site-id="${site.id}">
+                        <input type="checkbox" class="site-checkbox" id="site-${site.id}" ${checked}>
                         <label for="site-${site.id}">${window.escapeHTML(site.name)}</label>
+                        <input type="text" class="site-username-input" placeholder="Usuario para este sitio" value="${window.escapeHTML(siteUsername)}">
+                        <input type="password" class="site-password-input" placeholder="Contraseña (si cambia)">
                     </div>`;
                 });
                 sitesContainer.innerHTML = html || '<p>No hay sitios para asignar.</p>';

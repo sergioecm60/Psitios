@@ -68,7 +68,7 @@ $pdo = get_pdo_connection();
 // Esta consulta ahora busca en los sitios asignados (sites y services), no en los personales (user_sites).
 // Es la clave para que el SSO funcione con los sitios compartidos.
 $stmt = $pdo->prepare("
-    SELECT s.id as site_id, s.name, s.username, s.password_encrypted
+    SELECT s.id as site_id, s.name, svc.username, svc.password_encrypted
     FROM sites s
     JOIN services svc ON s.id = svc.site_id
     WHERE svc.id = ? AND svc.user_id = ?
