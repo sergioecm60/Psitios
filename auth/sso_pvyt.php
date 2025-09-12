@@ -61,6 +61,8 @@ if (!$site_id) {
     sso_die(400, 'Solicitud Incorrecta', 'El ID del sitio es requerido para iniciar el SSO.');
 }
 
+error_log("[SSO INICIO] sso_pvyt.php: Solicitud para site_id: {$site_id} por user_id: {$_SESSION['user_id']}");
+
 $pdo = get_pdo_connection();
 $stmt = $pdo->prepare("
     SELECT us.name, us.username, us.password_encrypted 
@@ -71,6 +73,7 @@ $stmt->execute([$site_id, $_SESSION['user_id']]);
 $site = $stmt->fetch();
 
 if (!$site) {
+    error_log("[SSO ERROR] sso_pvyt.php: Sitio no encontrado o sin permisos. site_id: {$site_id}, user_id: {$_SESSION['user_id']}");
     sso_die(404, 'Acceso Denegado', 'Sitio no encontrado o no tienes permisos para acceder a él.');
 }
 
@@ -81,12 +84,14 @@ if (!$password) {
     if ($_SESSION['sso_attempts'] >= SSO_MAX_ATTEMPTS) {
         $_SESSION['sso_lockout_until'] = time() + SSO_LOCKOUT_TIME;
     }
+    error_log("[SSO ERROR] sso_pvyt.php: Fallo al descifrar contraseña para site_id: {$site_id}.");
     sso_die(500, 'Error de Configuración', 'No se pudieron descifrar las credenciales. Contacta al administrador.');
 }
 
 // Si la desencriptación fue exitosa, reiniciamos el contador de intentos.
 $_SESSION['sso_attempts'] = 0;
 unset($_SESSION['sso_lockout_until']);
+error_log("[SSO OK] sso_pvyt.php: Credenciales descifradas para '{$site['username']}' del sitio '{$site['name']}'.");
 
 // --- 4. Generación de Token de SSO ---
 $token = bin2hex(random_bytes(32));
@@ -102,6 +107,9 @@ foreach ($_SESSION['sso_tokens'] as $key => $data) {
     }
 }
 
+$redirect_url = rtrim(PVYTGESTIONES_BASE_URL, '/') . '/#/';
+error_log("[SSO INFO] sso_pvyt.php: Generando token. URL de redirección final será construida desde: {$redirect_url}");
+
 // ADVERTENCIA DE SEGURIDAD: Se almacena la contraseña en texto plano en la sesión.
 // Aunque es por un tiempo muy corto (SSO_TOKEN_LIFETIME), sigue siendo un riesgo.
 // Una futura mejora sería evitar este paso si es posible.
@@ -110,7 +118,7 @@ $_SESSION['sso_tokens'][$token] = [
     'password' => $password,
     'expires' => $expires,
     'site_name' => $site['name'],
-    'redirect_url' => rtrim(PVYTGESTIONES_BASE_URL, '/') . '/#/' // URL final a la que el proxy redirigirá.
+    'redirect_url' => $redirect_url // URL final a la que el proxy redirigirá.
 ];
 
 ?>

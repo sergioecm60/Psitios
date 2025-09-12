@@ -41,21 +41,21 @@ HTML;
 // --- 1. Validación del token interno de Psitios ---
 $sso_token = $_POST['sso_token'] ?? '';
 if (empty($sso_token) || !isset($_SESSION['sso_tokens'][$sso_token])) {
-    sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO es inválido o ha expirado.', "Invalid or missing sso_token.");
+    sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO es inválido o ha expirado.', "[SSO PROXY ERROR] Token de Psitios inválido, no encontrado o ya usado.");
 }
-    error_log("sso_login_proxy.php: sso_token valid: " . $sso_token);
+error_log("[SSO PROXY INFO] Token de Psitios recibido y encontrado en sesión: " . substr($sso_token, 0, 8) . "...");
 
 $token_data = $_SESSION['sso_tokens'][$sso_token];
 
 // Validar expiración del token
 if ($token_data['expires'] < time()) {
     unset($_SESSION['sso_tokens'][$sso_token]); // Limpiar token expirado
-    sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO ha expirado. Por favor, intenta de nuevo.', "Expired sso_token.");
-    error_log("sso_login_proxy.php: sso_token expired: " . $sso_token);
+    sso_proxy_die(401, 'Acceso no autorizado', 'El token de SSO ha expirado. Por favor, intenta de nuevo.', "[SSO PROXY ERROR] Token de Psitios expirado.");
 }
 
 // El token es de un solo uso. Invalidarlo inmediatamente para prevenir ataques de repetición.
 unset($_SESSION['sso_tokens'][$sso_token]);
+error_log("[SSO PROXY INFO] Token de Psitios validado y consumido. Procediendo a llamar a pvytGestiones.");
 
 $username = $token_data['username'];
 $password = $token_data['password'];
@@ -64,6 +64,7 @@ error_log("sso_login_proxy.php: username=". $username . " redirect_url=" . $redi
 
 // --- 2. Llamada cURL al endpoint de login de pvytGestiones ---
 $ch = curl_init();
+error_log("[SSO PROXY INFO] Realizando llamada cURL a: " . PVYTGESTIONES_LOGIN_URL);
 
 $post_data = [
     'peticion' => 6,
@@ -72,6 +73,7 @@ $post_data = [
         'password' => $password
     ]
 ];
+error_log("[SSO PROXY INFO] Datos cURL (sin contraseña): " . json_encode(['peticion' => 6, 'usuario' => ['nombreUsuario' => $username]]));
 
 curl_setopt($ch, CURLOPT_URL, PVYTGESTIONES_LOGIN_URL);
 curl_setopt($ch, CURLOPT_POST, true);
@@ -98,16 +100,16 @@ curl_close($ch);
 // --- 3. Procesamiento de la respuesta de pvytGestiones ---
 
 if ($curl_error) {
-    sso_proxy_die(502, 'Error de Comunicación', 'No se pudo conectar con el sistema de destino.', "cURL error: {$curl_error}");
+    sso_proxy_die(502, 'Error de Comunicación', 'No se pudo conectar con el sistema de destino.', "[SSO PROXY ERROR] cURL error: {$curl_error}");
 }
 
 if ($http_code !== 200) {
-    sso_proxy_die(502, 'Error de Autenticación Externa', "El sistema de destino devolvió un error (Código: {$http_code}).", "pvytGestiones returned HTTP {$http_code}. Response: {$response_body}");
+    sso_proxy_die(502, 'Error de Autenticación Externa', "El sistema de destino devolvió un error (Código: {$http_code}).", "[SSO PROXY ERROR] pvytGestiones devolvió HTTP {$http_code}. Respuesta: {$response_body}");
 }
 
 $response_data = json_decode($response_body, true);
 
-error_log("sso_login_proxy.php: pvytGestiones response: " . print_r($response_data, true));
+error_log("[SSO PROXY INFO] Respuesta de pvytGestiones (HTTP {$http_code}): " . $response_body);
 // Verificar si la respuesta es un JSON válido y contiene el token esperado.
 if (json_last_error() !== JSON_ERROR_NONE || !isset($response_data['token']) || empty($response_data['token'])) {
     sso_proxy_die(500, 'Respuesta Inválida', 'El sistema de destino no devolvió un token de acceso válido. Podrían ser credenciales incorrectas.', "Invalid JSON or missing token from pvytGestiones. Raw Response: " . $response_body);
@@ -115,6 +117,7 @@ if (json_last_error() !== JSON_ERROR_NONE || !isset($response_data['token']) || 
 
 $pvyt_token = $response_data['token'];
 
+error_log("[SSO PROXY OK] Token de pvytGestiones recibido: " . substr($pvyt_token, 0, 8) . "...");
 // --- 4. Redirección final al navegador del usuario ---
 
 // Construir la URL de redirección final, añadiendo el token como parámetro.
@@ -143,6 +146,8 @@ $final_url .= '?' . http_build_query($query_params);
 if (isset($url_parts['fragment'])) {
     $final_url .= '#' . $url_parts['fragment'];
 }
+
+error_log("[SSO PROXY INFO] Redirigiendo al usuario a: " . $final_url);
 
 // Redirigir al usuario. El navegador recibirá esta cabecera y cargará la nueva URL.
 header('Location: ' . $final_url, true, 302);
