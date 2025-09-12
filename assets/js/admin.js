@@ -779,6 +779,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 8. GESTIÓN DE SITIOS ---
     const sitesTableBody = document.querySelector('#sites-table-body');
     const siteForm = document.getElementById('site-form');
+    const siteIsSsoCheckbox = document.getElementById('site-is-sso');
+
+    /**
+     * Muestra u oculta los campos de credenciales globales en el modal de sitios
+     * basado en si el sitio es SSO o no. Para sitios SSO, las credenciales
+     * se gestionan por usuario, no globalmente.
+     * @param {boolean} isSso - True si el sitio es SSO.
+     */
+    function toggleSsoSiteFields(isSso) {
+        const usernameGroup = document.getElementById('site-username-group');
+        const passwordGroup = document.getElementById('site-password-group');
+        if (usernameGroup && passwordGroup) {
+            usernameGroup.style.display = isSso ? 'none' : '';
+            passwordGroup.style.display = isSso ? 'none' : '';
+        }
+    }
+
+    siteIsSsoCheckbox?.addEventListener('change', (e) => {
+        toggleSsoSiteFields(e.target.checked);
+    });
 
     async function fetchSites() {
         if (!sitesTableBody) return;
@@ -818,6 +838,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('site-modal-title').textContent = 'Agregar Sitio';
         const visibilityGroup = document.getElementById('site-visibility-group');
         visibilityGroup.classList.toggle('hidden', CURRENT_USER_ROLE !== 'superadmin');
+        toggleSsoSiteFields(false); // Por defecto, los campos son visibles al agregar.
         openModal('site-modal');
     });
 
@@ -838,6 +859,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('site-username').value = site.username;
                 document.getElementById('site-notes').value = site.notes;
                 document.getElementById('site-is-sso').checked = site.is_sso;
+                toggleSsoSiteFields(site.is_sso); // Ajustar visibilidad al cargar
                 const visibilityGroup = document.getElementById('site-visibility-group');
                 visibilityGroup.classList.toggle('hidden', CURRENT_USER_ROLE !== 'superadmin');
                 openModal('site-modal');

@@ -437,11 +437,11 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                     <label for="site-url">URL del Sitio</label>
                     <input type="text" id="site-url" name="url" placeholder="ej: 192.168.0.1/misitio o https://google.com" required autocomplete="url">
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="site-username-group">
                     <label for="site-username">Usuario</label>
                     <input type="text" id="site-username" name="username" autocomplete="username">
                 </div>
-                <div class="form-group">
+                <div class="form-group" id="site-password-group">
                     <label for="site-password">Nueva Contraseña (opcional)</label>
                     <div class="password-wrapper">
                         <input type="password" id="site-password" name="password" autocomplete="new-password">
