@@ -82,8 +82,15 @@ if (!$site) {
 }
 
 // --- 3. Descifrado de Credenciales ---
+// Primero, verificar que la contraseña encriptada exista. Si es null o vacía,
+// significa que no se han configurado credenciales para esta asignación específica.
+if (empty($site['password_encrypted'])) {
+    error_log("[SSO ERROR] sso_pvyt.php: No hay contraseña asignada para el service_id: {$service_id} (site_id: {$site['site_id']}).");
+    sso_die(500, 'Error de Configuración', 'No se han configurado credenciales para tu acceso a este sitio. Por favor, contacta al administrador.');
+}
+
 $password = decrypt_data($site['password_encrypted']);
-if (!$password) {
+if ($password === null) { // Comprobar explícitamente por null, ya que una contraseña vacía "" podría ser válida.
     $_SESSION['sso_attempts']++;
     if ($_SESSION['sso_attempts'] >= SSO_MAX_ATTEMPTS) {
         $_SESSION['sso_lockout_until'] = time() + SSO_LOCKOUT_TIME;
