@@ -201,7 +201,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let buttonsHtml = '';
         if (isSsoSite) {
             // 1. Si es un sitio asignado con SSO, solo mostrar el botón "Ingresar".
-            buttonsHtml = `<a href="auth/sso_pvyt.php?id=${id}" class="btn btn-primary btn-sso">Ingresar</a>`;
+            buttonsHtml = `<a href="auth/sso_pvyt.php?id=${id}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sso">Ingresar</a>`;
         } else if (isAssigned) {
             // 2. Si es un sitio asignado normal, mostrar los botones de siempre.
             buttonsHtml = `
