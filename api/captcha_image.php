@@ -22,6 +22,7 @@ if (!extension_loaded('gd')) {
 }
 
 use Gregwar\Captcha\CaptchaBuilder;
+use Gregwar\Captcha\PhraseBuilder;
 
 try {
     // Limpiar cualquier salida anterior para asegurar que solo se envíe la imagen.
@@ -29,10 +30,21 @@ try {
         ob_end_clean();
     }
 
-    // Crear una instancia del generador de CAPTCHA y construir la imagen.
-    // Esto puede fallar si falta la extensión GD de PHP.
-    $builder = new CaptchaBuilder;
-    $builder->build(150, 40);
+    // Crear un generador de frases más legibles (5 caracteres, sin letras ambiguas).
+    $phraseBuilder = new PhraseBuilder(5, 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789');
+    
+    // Crear una instancia del generador de CAPTCHA con la frase personalizada.
+    $builder = new CaptchaBuilder($phraseBuilder->build());
+
+    // Configurar el CAPTCHA para ser más legible y amigable.
+    $builder->setDistortion(false); // Desactivar la distorsión ondulada.
+    $builder->setMaxBehindLines(0); // Eliminar líneas de ruido de fondo.
+    $builder->setMaxFrontLines(0);  // Eliminar líneas de ruido frontales.
+    $builder->setBackgroundColor(245, 245, 245); // Usar un fondo gris muy claro.
+    $builder->setTextColor(50, 50, 50); // Usar un color de texto oscuro para alto contraste.
+    
+    // Construir la imagen final del CAPTCHA.
+    $builder->build(150, 40, null);
 
     // Almacenar la frase del CAPTCHA en la sesión para su validación posterior.
     $_SESSION['captcha_phrase'] = $builder->getPhrase();

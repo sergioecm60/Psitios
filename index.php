@@ -27,8 +27,10 @@ generate_csrf_token(); // La función está en config/security.php
 
 // Si el usuario ya está logueado, redirigir al panel correspondiente.
 if (isset($_SESSION['user_id'])) {
-    // La redirección se basa en el rol para dirigir al panel correcto.
-    $redirect_url = ($_SESSION['user_role'] === 'superadmin' || $_SESSION['user_role'] === 'admin') 
+    // La redirección se basa en el rol. Se normaliza el rol (quitar espacios y convertir a minúsculas)
+    // para una comparación robusta, evitando problemas si el rol en la sesión tiene mayúsculas o espacios.
+    $user_role = isset($_SESSION['user_role']) ? strtolower(trim($_SESSION['user_role'])) : 'user';
+    $redirect_url = ($user_role === 'superadmin' || $user_role === 'admin')
         ? 'admin.php' 
         : 'panel.php';
     header('Location: ' . $redirect_url);
