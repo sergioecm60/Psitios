@@ -37,7 +37,7 @@ if (isset($_SESSION['user_id'])) {
 
 // --- Headers de Seguridad ---
 header('Content-Type: text/html; charset=utf-8');
-header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self';");
+header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$nonce}'; style-src 'self' 'nonce-{$nonce}'; connect-src 'self'; img-src 'self';");
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -48,6 +48,24 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     <title>Panel de Acceso Seguro</title>
     <link rel="icon" href="<?= BASE_URL ?>favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/css/main.css">
+    <style nonce="<?= $nonce ?>">
+        .captcha-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .captcha-image-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        #captcha-image { border-radius: 4px; border: 1px solid #ccc; }
+        #reload-captcha {
+            background: none; border: 1px solid #ccc; border-radius: 50%;
+            width: 30px; height: 30px; cursor: pointer; font-size: 18px;
+            line-height: 1; padding: 0;
+        }
+    </style>
 </head>
 <body class="login-page">
     <div class="login-container">
@@ -64,8 +82,12 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
             </div>
             <!-- CAPTCHA Numérico -->
             <div class="form-group captcha-group">
-                <label for="captcha" id="captcha-question-label">Verificación...</label>
-                <input type="text" id="captcha" name="captcha" required autocomplete="off" placeholder="Respuesta">
+                <label for="captcha">Verificación de seguridad</label>
+                <div class="captcha-image-container">
+                    <img src="api/captcha_image.php" alt="CAPTCHA" id="captcha-image" title="Texto de verificación">
+                    <button type="button" id="reload-captcha" title="Recargar imagen">&#x21bb;</button>
+                </div>
+                <input type="text" id="captcha" name="captcha" required autocomplete="off" placeholder="Escribe el texto de la imagen">
             </div>
             <button type="submit" class="btn-login">Iniciar Sesión</button>
         </form>
@@ -89,22 +111,18 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     </footer>
 
     <script nonce="<?= $nonce ?>">
-        // Función para cargar la pregunta del CAPTCHA desde la API.
-        async function loadCaptcha() {
-            const captchaLabel = document.getElementById('captcha-question-label');
-            try {
-                // Se añade un timestamp para evitar que el navegador cachee la respuesta.
-                const response = await fetch('api/captcha_generator.php?' + new Date().getTime());
-                const data = await response.json();
-                if (data.question) {
-                    captchaLabel.textContent = data.question;
-                } else {
-                    captchaLabel.textContent = 'No se pudo cargar la verificación.';
-                }
-            } catch (error) {
-                captchaLabel.textContent = 'Error de conexión.';
+        document.addEventListener('DOMContentLoaded', () => {
+            const reloadButton = document.getElementById('reload-captcha');
+            const captchaImage = document.getElementById('captcha-image');
+
+            if (reloadButton && captchaImage) {
+                reloadButton.addEventListener('click', () => {
+                    // Añadir un timestamp para evitar que el navegador cachee la imagen
+                    captchaImage.src = 'api/captcha_image.php?' + new Date().getTime();
+                    document.getElementById('captcha').focus();
+                });
             }
-        }
+        });
 
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -140,7 +158,9 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                     // Si hay un error, se muestra el mensaje y se recarga el CAPTCHA.
                     loginError.textContent = result.message || 'Error desconocido.';
                     loginError.classList.remove('hidden');
-                    loadCaptcha();
+                    // Recargar la imagen del CAPTCHA para un nuevo intento
+                    const reloadButton = document.getElementById('reload-captcha');
+                    if (reloadButton) reloadButton.click();
                     document.getElementById('captcha').value = ''; // Limpiar el campo
                 }
             } catch (error) {
@@ -152,9 +172,6 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
                 submitButton.textContent = 'Iniciar Sesión';
             }
         });
-
-        // Cargar el CAPTCHA inicial cuando la página esté lista.
-        document.addEventListener('DOMContentLoaded', loadCaptcha);
     </script>
 </body>
 </html>

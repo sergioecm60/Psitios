@@ -50,14 +50,14 @@ if (empty($captcha_answer)) {
     send_json_error_and_exit(400, 'Por favor, complete la verificación.');
 }
 
-// Compara la respuesta del usuario con la almacenada en la sesión.
-if (!isset($_SESSION['captcha_answer']) || $captcha_answer != $_SESSION['captcha_answer']) {
-    unset($_SESSION['captcha_answer']); // Limpiar para el próximo intento.
-    send_json_error_and_exit(401, 'La respuesta de verificación es incorrecta.');
+// Compara la respuesta del usuario con la almacenada en la sesión (insensible a mayúsculas/minúsculas).
+if (!isset($_SESSION['captcha_phrase']) || strcasecmp($captcha_answer, $_SESSION['captcha_phrase']) !== 0) {
+    unset($_SESSION['captcha_phrase']); // Limpiar para el próximo intento.
+    send_json_error_and_exit(401, 'El texto de verificación es incorrecto.');
 }
 
 // Si el CAPTCHA es correcto, se limpia para que no pueda ser reutilizado.
-unset($_SESSION['captcha_answer']);
+unset($_SESSION['captcha_phrase']);
 
 // --- Lógica Principal de Autenticación ---
 
@@ -87,6 +87,9 @@ try {
     if ($user && password_verify($password, $user['password_hash'])) {
         // Éxito en la autenticación.
         
+        // Normalizar el rol a minúsculas para consistencia y evitar errores por mayúsculas/minúsculas en la BD.
+        $user_role = strtolower($user['role']);
+
         // 1. Regenerar el ID de sesión para prevenir ataques de fijación de sesión.
         session_regenerate_id(true);
         
@@ -94,14 +97,14 @@ try {
         // Estos datos se usarán en toda la aplicación para autorización y personalización.
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
-        $_SESSION['user_role'] = $user['role'];
+        $_SESSION['user_role'] = $user_role; // Almacenar el rol normalizado
         $_SESSION['company_id'] = $user['company_id'];
         $_SESSION['branch_id'] = $user['branch_id'];
         $_SESSION['department_id'] = $user['department_id'];
         $_SESSION['last_activity'] = time(); // Para gestionar el tiempo de inactividad de la sesión.
 
         // 3. Determinar la página de destino según el rol del usuario.
-        $redirect = ($user['role'] === 'superadmin' || $user['role'] === 'admin') 
+        $redirect = ($user_role === 'superadmin' || $user_role === 'admin') 
             ? 'admin.php' 
             : 'panel.php';
 
