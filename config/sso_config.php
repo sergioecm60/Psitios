@@ -60,7 +60,7 @@ define('SSO_LOCKOUT_TIME', 300); // 5 minutos
  * PVYTGESTIONES_LOGIN_URL=http://pedrazaviajes.dyndns.org:5050/pvytGestiones/php/servicios/servicioUsuarios.php
  * --------------------------------------------------------------------------------
  */
-define('PVYTGESTIONES_LOGIN_URL', $_ENV['PVYTGESTIONES_LOGIN_URL'] ?? 'http://192.168.0.6/pvytGestiones/php/servicios/servicioUsuarios.php');
+define('PVYTGESTIONES_LOGIN_URL', $_ENV['PVYTGESTIONES_LOGIN_URL'] ?? 'http://localhost/pvytGestiones/php/servicios/servicioUsuarios.php');
 
 /**
  * @const PVYTGESTIONES_BASE_URL
@@ -72,6 +72,6 @@ define('PVYTGESTIONES_LOGIN_URL', $_ENV['PVYTGESTIONES_LOGIN_URL'] ?? 'http://19
  * EJEMPLOS DE CONFIGURACIÓN EN .env:
  * PVYTGESTIONES_BASE_URL=http://localhost/pvytGestiones
  * PVYTGESTIONES_BASE_URL=http://192.168.0.100/pvytGestiones
- * PVYTGESTIONES_BASE_URL=http://pedrazaviajes.dyndns.org:5050/pvytGestiones
+ * PVYTGESTIONES_BASE_URL=http://pedrazaviajes.dyndns.org:55063/pvytGestiones
  */
-define('PVYTGESTIONES_BASE_URL', $_ENV['PVYTGESTIONES_BASE_URL'] ?? 'http://192.168.0.6/pvytGestiones');
+define('PVYTGESTIONES_BASE_URL', $_ENV['PVYTGESTIONES_BASE_URL'] ?? 'http://localhost/pvytGestiones');
