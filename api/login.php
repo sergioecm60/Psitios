@@ -87,8 +87,8 @@ try {
     if ($user && password_verify($password, $user['password_hash'])) {
         // Éxito en la autenticación.
         
-        // Normalizar el rol a minúsculas para consistencia y evitar errores por mayúsculas/minúsculas en la BD.
-        $user_role = strtolower($user['role']);
+        // Normalizar el rol: quitar espacios y convertir a minúsculas para máxima consistencia.
+        $user_role = strtolower(trim($user['role']));
 
         // 1. Regenerar el ID de sesión para prevenir ataques de fijación de sesión.
         session_regenerate_id(true);

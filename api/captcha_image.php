@@ -14,6 +14,13 @@ if (!class_exists('Gregwar\Captcha\CaptchaBuilder')) {
     die("Error Crítico: La librería para generar CAPTCHA no se encuentra.\n\nPor favor, ejecute 'composer update' en la terminal desde la raíz del proyecto (C:\\laragon\\www\\Psitios) para instalar las dependencias necesarias.");
 }
 
+// Verificación de la extensión GD, necesaria para la creación de imágenes.
+if (!extension_loaded('gd')) {
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    die("Error de Configuración: La extensión 'GD' de PHP no está habilitada.\n\nEsta extensión es necesaria para crear imágenes. Descomente la línea 'extension=gd' en su archivo 'php.ini' y reinicie el servidor web.");
+}
+
 use Gregwar\Captcha\CaptchaBuilder;
 
 try {
@@ -30,11 +37,11 @@ try {
     // Almacenar la frase del CAPTCHA en la sesión para su validación posterior.
     $_SESSION['captcha_phrase'] = $builder->getPhrase();
 
-    // Enviar la imagen al navegador.
+    // Enviar la imagen JPEG al navegador.
     header('Content-type: image/jpeg');
     $builder->output();
 } catch (Throwable $e) {
-    // Capturar cualquier error (ej. falta de extensión GD) y mostrar un mensaje claro.
+    // Capturar cualquier otro error inesperado y mostrar un mensaje claro.
     http_response_code(500);
     header('Content-Type: text/plain; charset=utf-8');
     error_log("Error en captcha_image.php: " . $e->getMessage());
