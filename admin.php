@@ -63,6 +63,8 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
         .site-assignment-row input[type="password"] {
             width: 180px;
         }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; }
+        .header-controls { display: flex; align-items: center; gap: 15px; }
     </style>
 </head>
 <body 
@@ -74,18 +76,21 @@ header("Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{$
     data-department-id="<?= htmlspecialchars($_SESSION['department_id'] ?? '', ENT_QUOTES, 'UTF-8') ?>"
 >
     <div class="container">
-        <header>
+        <header class="admin-header">
             <h1>Panel de Administración</h1>
-            <div class="theme-selector">
-                <label for="theme-select">🎨 Tema:</label>
-                <select id="theme-select">
-                    <option value="light">Claro</option>
-                    <option value="dark">Oscuro</option>
-                    <option value="blue">Azul</option>
-                    <option value="green">Verde</option>
-                </select>
+            <div class="header-controls">
+                <div class="theme-selector">
+                    <label for="theme-select">🎨 Tema:</label>
+                    <select id="theme-select">
+                        <option value="light">Claro</option>
+                        <option value="dark">Oscuro</option>
+                        <option value="blue">Azul</option>
+                        <option value="green">Verde</option>
+                    </select>
+                </div>
+                <a href="panel.php" class="btn btn-info">Ir al Panel de Usuario</a>
+                <a href="logout.php" class="btn btn-logout">Cerrar Sesión</a>
             </div>
-            <a href="logout.php">Cerrar Sesión</a>
         </header>
         <nav class="tab-nav">
             <button class="tab-link" data-tab="audit-tab">📋 Auditoría</button>
