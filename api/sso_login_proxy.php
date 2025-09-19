@@ -62,6 +62,10 @@ $password = $token_data['password'];
 $redirect_url = $token_data['redirect_url'];
 
 // --- 2. Llamada cURL al endpoint de login de pvytGestiones ---
+// Aquí, el servidor de Psitios actúa como un cliente para el servidor de pvytGestiones.
+// La URL de destino (PVYTGESTIONES_LOGIN_URL) se define en sso_config.php y se configura en el archivo .env.
+// Esto permite cambiar fácilmente entre entornos de desarrollo (localhost), LAN (IP interna) o producción (dominio público).
+
 $ch = curl_init();
 error_log("[SSO PROXY INFO] Realizando llamada cURL a: " . PVYTGESTIONES_LOGIN_URL);
 

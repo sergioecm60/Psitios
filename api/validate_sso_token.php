@@ -11,13 +11,19 @@ require_once '../config/sso_config.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
-// Solo permitir desde localhost (backend-to-backend)
+// --- 1. Validación de Seguridad: Solo Peticiones Internas ---
+// Este script es un endpoint de servicio interno. NUNCA debe ser accesible desde fuera del servidor.
+// La siguiente lista blanca de IPs asegura que solo el propio servidor pueda hacerle peticiones.
+// '127.0.0.1' y '::1' son las direcciones de loopback (localhost) para IPv4 e IPv6.
+// $_SERVER['SERVER_ADDR'] es la IP principal del servidor. Esto permite que el proxy (sso_login_proxy.php)
+// se comunique con este validador, incluso si no usa 'localhost'.
 $allowed_ips = ['127.0.0.1', '::1', $_SERVER['SERVER_ADDR'] ?? '127.0.0.1'];
 $requester_ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
 
 if (!in_array($requester_ip, $allowed_ips)) {
     error_log("Acceso SSO denegado desde IP no permitida: " . $requester_ip);
     http_response_code(403);
+    // Este mensaje es intencionadamente genérico para no dar pistas a posibles atacantes.
     echo json_encode(['success' => false, 'message' => 'Acceso denegado. Solo peticiones internas.']);
     exit;
 }

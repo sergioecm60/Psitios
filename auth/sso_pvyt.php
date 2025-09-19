@@ -104,11 +104,16 @@ $_SESSION['sso_attempts'] = 0;
 unset($_SESSION['sso_lockout_until']);
 error_log("[SSO OK] sso_pvyt.php: Credenciales descifradas para '{$site['username']}' del sitio '{$site['name']}'.");
 
-// --- 4. Generación de Token de SSO ---
+// --- 4. Generación de Token de SSO y URL de Redirección Dinámica ---
 $token = bin2hex(random_bytes(32));
 $expires = time() + SSO_TOKEN_LIFETIME;
 
 // Limpiar tokens expirados para mantener la sesión limpia.
+// El sistema construye la URL de redirección final de forma dinámica. Esto es muy robusto.
+// No importa si accedes a Psitios por 'localhost', '192.168.0.X' o 'pedrazaviajes.dyndns.org',
+// el sistema usará ese mismo host para construir la URL de destino, asegurando que la redirección funcione en cualquier red.
+// $_SERVER['HTTP_HOST'] contiene el dominio y puerto que el usuario usó para acceder a la página.
+
 if (!isset($_SESSION['sso_tokens'])) {
     $_SESSION['sso_tokens'] = [];
 }

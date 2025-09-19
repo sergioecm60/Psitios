@@ -46,14 +46,32 @@ define('SSO_LOCKOUT_TIME', 300); // 5 minutos
  * @const PVYTGESTIONES_LOGIN_URL
  * URL del endpoint de login del sistema pvytGestiones.
  * Es la dirección a la que el proxy de SSO enviará las credenciales.
- * Es configurable a través de la variable PVYTGESTIONES_LOGIN_URL en el .env.
+ * Esta es la configuración más importante para la comunicación backend-a-backend.
+ *
+ * EJEMPLOS DE CONFIGURACIÓN EN .env:
+ * --------------------------------------------------------------------------------
+ * # 1. Para desarrollo local (ambos sistemas en la misma máquina):
+ * PVYTGESTIONES_LOGIN_URL=http://localhost/pvytGestiones/php/servicios/servicioUsuarios.php
+ *
+ * # 2. Para acceso en la misma red local (LAN), usando la IP del servidor:
+ * PVYTGESTIONES_LOGIN_URL=http://192.168.0.100/pvytGestiones/php/servicios/servicioUsuarios.php
+ *
+ * # 3. Para acceso desde internet, usando un dominio público y puerto:
+ * PVYTGESTIONES_LOGIN_URL=http://pedrazaviajes.dyndns.org:5050/pvytGestiones/php/servicios/servicioUsuarios.php
+ * --------------------------------------------------------------------------------
  */
 define('PVYTGESTIONES_LOGIN_URL', $_ENV['PVYTGESTIONES_LOGIN_URL'] ?? 'http://192.168.0.6/pvytGestiones/php/servicios/servicioUsuarios.php');
 
 /**
  * @const PVYTGESTIONES_BASE_URL
  * URL base del sistema pvytGestiones.
- * Se utiliza para construir las URL de redirección después de un login exitoso.
- * Es configurable a través de la variable PVYTGESTIONES_BASE_URL en el .env.
+ * Se utiliza para construir las URL de redirección después de un login exitoso si la construcción dinámica falla.
+ * NOTA: El script `sso_pvyt.php` ahora intenta construir esta URL dinámicamente,
+ * lo que hace que esta constante sea principalmente un respaldo.
+ *
+ * EJEMPLOS DE CONFIGURACIÓN EN .env:
+ * PVYTGESTIONES_BASE_URL=http://localhost/pvytGestiones
+ * PVYTGESTIONES_BASE_URL=http://192.168.0.100/pvytGestiones
+ * PVYTGESTIONES_BASE_URL=http://pedrazaviajes.dyndns.org:5050/pvytGestiones
  */
 define('PVYTGESTIONES_BASE_URL', $_ENV['PVYTGESTIONES_BASE_URL'] ?? 'http://192.168.0.6/pvytGestiones');
