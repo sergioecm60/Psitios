@@ -16,25 +16,29 @@ if (!class_exists('Gregwar\Captcha\CaptchaBuilder')) {
 
 use Gregwar\Captcha\CaptchaBuilder;
 
-// Limpiar cualquier salida anterior para asegurar que solo se envíe la imagen.
-if (ob_get_level()) {
-    ob_end_clean();
+try {
+    // Limpiar cualquier salida anterior para asegurar que solo se envíe la imagen.
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
+
+    // Crear una instancia del generador de CAPTCHA y construir la imagen.
+    // Esto puede fallar si falta la extensión GD de PHP.
+    $builder = new CaptchaBuilder;
+    $builder->build(150, 40);
+
+    // Almacenar la frase del CAPTCHA en la sesión para su validación posterior.
+    $_SESSION['captcha_phrase'] = $builder->getPhrase();
+
+    // Enviar la imagen al navegador.
+    header('Content-type: image/jpeg');
+    $builder->output();
+} catch (Throwable $e) {
+    // Capturar cualquier error (ej. falta de extensión GD) y mostrar un mensaje claro.
+    http_response_code(500);
+    header('Content-Type: text/plain; charset=utf-8');
+    error_log("Error en captcha_image.php: " . $e->getMessage());
+    die("Error al generar la imagen CAPTCHA.\n\nCausa probable: La extensión 'GD' de PHP no está habilitada en tu servidor.\nPor favor, verifica tu archivo 'php.ini' y asegúrate de que la línea ';extension=gd' esté descomentada (sin el ';').\n\nDetalle técnico: " . $e->getMessage());
 }
 
-// Crear una instancia del generador de CAPTCHA.
-$builder = new CaptchaBuilder;
-
-// Construir el CAPTCHA con 150x40 píxeles.
-$builder->build(150, 40);
-
-// Almacenar la frase del CAPTCHA en la sesión para su validación posterior.
-$_SESSION['captcha_phrase'] = $builder->getPhrase();
-
-// Establecer la cabecera para indicar que la salida es una imagen JPEG.
-header('Content-type: image/jpeg');
-
-// Enviar la imagen al navegador.
-$builder->output();
-
 exit;
-
